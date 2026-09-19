@@ -52,6 +52,7 @@ namespace CustomUnityCli.Editor
             "audit", "Scan assets for dangling serialized references and report counts by asset type.",
             "objects", "Count loaded objects by type and estimate their memory, largest first.",
             "references", "Find which assets reference a given asset, plus its own dependency count.",
+            "deps", "List what a given asset depends on, transitively by default.",
             "duplicates", "Group assets whose content fingerprint is identical.",
             "unused", "List assets that no scene or prefab in the project reaches (candidates, not a verdict).");
 
@@ -72,7 +73,7 @@ namespace CustomUnityCli.Editor
   ""properties"": {
     ""action"": {
       ""type"": ""string"",
-      ""enum"": [""audit"", ""objects"", ""references"", ""duplicates"", ""unused""],
+      ""enum"": [""audit"", ""objects"", ""references"", ""deps"", ""duplicates"", ""unused""],
       ""default"": ""audit""
     },
     ""path"": { ""type"": ""string"", ""description"": ""action=references: the asset to find referencers of."", ""aliases"": [""assetPath"", ""asset_path""] },
@@ -100,6 +101,7 @@ namespace CustomUnityCli.Editor
                 case "audit": return Audit(context);
                 case "objects": return Objects(context);
                 case "references": return References(context);
+                case "deps": return Deps(context);
                 case "duplicates": return Duplicates(context);
                 case "unused": return Unused(context);
                 default: return CucliCommandResult.Unsupported(action, ActionNames());
@@ -439,6 +441,77 @@ namespace CustomUnityCli.Editor
         /// database for each one's dependencies. There is no reverse index in the public API, so this
         /// is inherently a bounded scan and says so.
         /// </summary>
+        // ------------------------------------------------------------------ deps
+
+        /// <summary>
+        /// The forward direction: what this asset points at. The mirror image of
+        /// <see cref="References"/>, which walks the project looking for who points at it. This one is
+        /// a single AssetDatabase call and is therefore exact and cheap.
+        /// </summary>
+        private static CucliCommandResult Deps(CucliCommandContext context)
+        {
+            CucliArgs args = context.Input;
+            string requested = args.GetString("path") ?? args.GetString("assetPath") ?? args.GetString("asset_path");
+            if (string.IsNullOrWhiteSpace(requested))
+            {
+                return CucliCommandResult.Missing("path", "Example: --path Assets/Prefabs/Hero.prefab");
+            }
+
+            string target = CucliAssets.NormalizeAssetPath(requested);
+            if (target == null || CucliAssets.LoadMain(target) == null)
+            {
+                return CucliCommandResult.Fail(CucliErrors.AssetNotFound, "资产不存在：" + requested);
+            }
+
+            bool recursive = args.GetBool("recursive", true);
+            string[] dependencies;
+            try
+            {
+                dependencies = AssetDatabase.GetDependencies(target, recursive);
+            }
+            catch (Exception exception)
+            {
+                return CucliCommandResult.Fail(
+                    CucliErrors.CommandFailed,
+                    "读取依赖失败：" + exception.GetBaseException().Message);
+            }
+
+            var items = new List<JObject>();
+            foreach (string dependency in dependencies)
+            {
+                // GetDependencies reports the asset itself; a self-edge is noise, not a dependency.
+                if (string.Equals(dependency, target, StringComparison.OrdinalIgnoreCase)) continue;
+
+                Type type = AssetDatabase.GetMainAssetTypeAtPath(dependency);
+                items.Add(new JObject
+                {
+                    ["path"] = dependency,
+                    ["type"] = type == null ? "Unknown" : type.Name,
+                    ["extension"] = CucliAssets.Extension(dependency).ToLowerInvariant()
+                });
+            }
+
+            items.Sort((left, right) => string.Compare(
+                left["path"] == null ? string.Empty : left["path"].Value<string>(),
+                right["path"] == null ? string.Empty : right["path"].Value<string>(),
+                StringComparison.OrdinalIgnoreCase));
+
+            CucliPage<JObject> page = CucliPaging.Slice(items, args, DefaultPageSize);
+            JObject data = CucliPaging.Envelope(
+                page,
+                new JArray(page.Items.Cast<object>().ToArray()),
+                new JObject
+                {
+                    ["path"] = target,
+                    ["recursive"] = recursive,
+                    ["dependencyCount"] = items.Count
+                });
+
+            return CucliCommandResult.Ok(
+                data,
+                target + " 依赖 " + items.Count + " 个资产（recursive=" + recursive + "）。");
+        }
+
         private static CucliCommandResult References(CucliCommandContext context)
         {
             CucliArgs args = context.Input;

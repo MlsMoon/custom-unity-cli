@@ -810,6 +810,39 @@ function Submit-CucliJob {
     return $id
 }
 
+function Get-WorkerStallHint {
+    <#
+        Explains a timeout that is NOT a slow command.
+
+        The worker publishes its heartbeat from a background thread, so `timestampUtc` stays fresh
+        even when the Editor's main thread is blocked. Job execution runs ON the main thread, so a
+        stale `stateSampledAtUtc` means the queue physically cannot drain no matter how long the
+        caller waits - which is a completely different problem from "the command is slow", and needs a
+        completely different response. Reported here so a caller is not left guessing.
+    #>
+    param([string]$ProjectRoot)
+
+    $heartbeat = Get-Heartbeat $ProjectRoot
+    if ($null -eq $heartbeat -or [string]::IsNullOrWhiteSpace($heartbeat.stateSampledAtUtc)) { return '' }
+
+    try {
+        $sampled = [datetime]::Parse(
+            $heartbeat.stateSampledAtUtc,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [System.Globalization.DateTimeStyles]::AdjustToUniversal -bor [System.Globalization.DateTimeStyles]::AssumeUniversal)
+        $age = [int]([datetime]::UtcNow - $sampled).TotalSeconds
+    } catch {
+        return ''
+    }
+
+    if ($age -lt 20) { return '' }
+
+    return " The Editor's main thread has not ticked for $age seconds, so the queue cannot drain: " +
+           "Unity is blocked in a synchronous operation or a modal dialog. Job execution happens on that " +
+           "thread, so waiting longer will not help. Bring the Unity window to the front to check for a " +
+           "dialog, or restart the Editor; queued jobs survive a restart."
+}
+
 function Find-JobFile {
     param([string]$ProjectRoot, [string]$JobId)
     $directories = Get-JobDirectories $ProjectRoot
@@ -854,7 +887,7 @@ function Wait-CucliJob {
 
             return [ordered]@{
                 outcome = 'timeout'
-                message = "Job $JobId did not finish within $TimeoutSeconds seconds. A cancellation request was written; use 'cucli job status $JobId' to follow it."
+                message = "Job $JobId did not finish within $TimeoutSeconds seconds. A cancellation request was written; use 'cucli job status $JobId' to follow it." + (Get-WorkerStallHint $ProjectRoot)
             }
         }
 

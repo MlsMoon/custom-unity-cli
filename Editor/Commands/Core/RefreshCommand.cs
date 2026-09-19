@@ -197,7 +197,8 @@ namespace CustomUnityCli.Editor
                 context,
                 complete,
                 "Compilation finished with no errors.",
-                "Script compilation finished with errors: ");
+                "Script compilation finished with errors: ",
+                true);
         }
 
         private static void WaitDeferred(CucliCommandContext context, Action<CucliCommandResult> complete)
@@ -205,11 +206,11 @@ namespace CustomUnityCli.Editor
             bool requireSuccess = context.Input.GetBool("requireCompileSuccess", false);
             if (!requireSuccess)
             {
-                WaitForIdle(context, complete, "The Editor is idle.", null);
+                WaitForIdle(context, complete, "The Editor is idle.", null, false);
                 return;
             }
 
-            WaitForIdle(context, complete, "The Editor is idle and compilation succeeded.", "Compilation failed: ");
+            WaitForIdle(context, complete, "The Editor is idle and compilation succeeded.", "Compilation failed: ", true);
         }
 
         /// <summary>
@@ -222,14 +223,19 @@ namespace CustomUnityCli.Editor
             CucliCommandContext context,
             Action<CucliCommandResult> complete,
             string successMessage,
-            string errorPrefix)
+            string errorPrefix,
+            bool requireObservedBusy)
         {
             int timeoutSeconds = Mathf.Clamp(context.Input.GetInt("timeoutSeconds", 300), 1, 1800);
-            double deadline = EditorApplication.timeSinceStartup + timeoutSeconds;
+            double started = EditorApplication.timeSinceStartup;
+            double deadline = started + timeoutSeconds;
             bool done = false;
 
-            // A compile that has not started yet would make us return instantly and lie, so require
-            // at least one observed busy tick before accepting "idle".
+            // The compile path must not read "already idle" as success before the compile it just
+            // requested has even started. But requiring a busy tick forever is worse: on a clean
+            // project with nothing to recompile the Editor never becomes busy, and the job would
+            // stall for the whole timeout. So the guard is a short grace window, not a hard gate.
+            const double BusyGraceSeconds = 10.0;
             bool sawBusy = EditorApplication.isCompiling || EditorApplication.isUpdating;
 
             EditorApplication.CallbackFunction tick = null;
@@ -249,7 +255,8 @@ namespace CustomUnityCli.Editor
                 bool busy = EditorApplication.isCompiling || EditorApplication.isUpdating;
                 if (busy) sawBusy = true;
 
-                if (!busy && sawBusy)
+                if (!busy && (sawBusy || !requireObservedBusy
+                    || EditorApplication.timeSinceStartup - started >= BusyGraceSeconds))
                 {
                     done = true;
                     EditorApplication.update -= tick;

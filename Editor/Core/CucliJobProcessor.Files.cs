@@ -224,6 +224,62 @@ namespace CustomUnityCli.Editor
             return DateTime.UtcNow - created > TimeSpan.FromSeconds(request.TimeoutSeconds);
         }
 
+        /// <summary>Age of a request in seconds, or 0 when its timestamp cannot be read.</summary>
+        private static long AgeSeconds(CucliJobRequest request)
+        {
+            DateTime created;
+            if (!DateTime.TryParse(
+                    request.CreatedAtUtc,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
+                    out created))
+            {
+                return 0L;
+            }
+
+            double seconds = (DateTime.UtcNow - created).TotalSeconds;
+            return seconds < 0 ? 0L : (long)seconds;
+        }
+
+        /// <summary>
+        /// True when a waiting job has outlived any plausible domain reload and must be evicted.
+        ///
+        /// The grace period is deliberately generous - twice the job's own timeout plus a minute -
+        /// because the legitimate reason to wait is a recompile plus import, which can take a while on
+        /// a large project. Beyond that the job is not going to resolve, and because a waiting job
+        /// blocks the entire queue, keeping it costs every later caller. Evicting turns a silent
+        /// permanent stall into one visible failure.
+        /// </summary>
+        private static bool IsWedged(CucliJobRequest request)
+        {
+            long grace = Math.Max(request.TimeoutSeconds, 60) * 2L + 60L;
+            return AgeSeconds(request) > grace;
+        }
+
+        /// <summary>
+        /// Deletes sidecars whose waiting marker is gone. Without this, a crash between publishing a
+        /// result and removing its sidecar would leave a file nothing ever cleans up.
+        /// </summary>
+        private static void PurgeOrphanPendingResults()
+        {
+            string[] pending;
+            try
+            {
+                pending = Directory.GetFiles(CucliPaths.Waiting, "*.pending");
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return;
+            }
+
+            foreach (string sidecar in pending)
+            {
+                string id = Path.GetFileNameWithoutExtension(sidecar);
+                if (File.Exists(Path.Combine(CucliPaths.Waiting, id + ".json"))) continue;
+                TryDelete(sidecar);
+            }
+        }
+
         private static string FindPendingJob(string id)
         {
             foreach (string directory in new[]

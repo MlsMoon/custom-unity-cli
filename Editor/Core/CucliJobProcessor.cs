@@ -35,6 +35,7 @@ namespace CustomUnityCli.Editor
 
         private static DateTime s_nextPollUtc;
         private static DateTime s_nextPruneUtc;
+        private static DateTime s_stallWarningUtc;
         private static int s_completed;
 
         internal static int CompletedCount => s_completed;
@@ -145,10 +146,18 @@ namespace CustomUnityCli.Editor
         /// <summary>
         /// Jobs parked in <c>waiting</c> survive a domain reload. Once the Editor is idle again we
         /// resolve them from the freshly compiled state.
+        ///
+        /// This loop is also the queue's safety valve. <see cref="ProcessNextQueuedJob"/> refuses to
+        /// start anything while <c>waiting</c> is non-empty, so a single job that can never be
+        /// resolved would wedge every later job forever. Nothing else would notice: the Editor looks
+        /// idle and the heartbeat stays healthy while the queue silently stops draining. Stale
+        /// waiting jobs are therefore evicted on age, and the eviction is reported.
         /// </summary>
         private static void CompleteWaitingJobs()
         {
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+
+            PurgeOrphanPendingResults();
 
             string[] waiting;
             try
@@ -163,6 +172,20 @@ namespace CustomUnityCli.Editor
             foreach (string path in waiting)
             {
                 CucliJobRequest request = TryReadRequest(path) ?? FallbackRequest(path);
+
+                // Safety valve: a waiting job that has outlived any plausible reload is wedged, and
+                // leaving it here would block every later job. Fail it loudly instead.
+                if (IsWedged(request))
+                {
+                    WriteTerminal(path, CucliPaths.Failed, request, false,
+                        CucliErrors.JobExpired,
+                        "This job stayed in the waiting queue far longer than its timeout allows, "
+                        + "which would block every later job. It was evicted so the queue keeps draining; "
+                        + "check whether the command completed a partial write before retrying it.",
+                        new { evictedFrom = "waiting", waitedSeconds = AgeSeconds(request) },
+                        0L);
+                    continue;
+                }
 
                 // Reload-capable jobs store their real result in a sidecar before parking here.
                 // Publishing it verbatim is what keeps "cucli refresh compile" returnable.
@@ -219,14 +242,40 @@ namespace CustomUnityCli.Editor
         private static void ProcessNextQueuedJob()
         {
             if (Directory.EnumerateFiles(CucliPaths.Running, "*.json").Any()) return;
-            if (Directory.EnumerateFiles(CucliPaths.Waiting, "*.json").Any()) return;
+            if (Directory.EnumerateFiles(CucliPaths.Waiting, "*.json").Any())
+            {
+                WarnAboutStall();
+                return;
+            }
 
             string queued = OldestFile(CucliPaths.Queued);
             if (queued == null) return;
 
+            s_stallWarningUtc = DateTime.MinValue;
             string running = Path.Combine(CucliPaths.Running, Path.GetFileName(queued));
             if (!TryClaim(queued, running)) return;
             Execute(running);
+        }
+
+        /// <summary>
+        /// Makes a wedged queue visible instead of silent.
+        ///
+        /// With a healthy Editor and work queued but nothing being claimed, the only cause is a job
+        /// parked in <c>waiting</c>. That state is otherwise indistinguishable from "idle", so it is
+        /// worth one rate-limited warning naming the culprit.
+        /// </summary>
+        private static void WarnAboutStall()
+        {
+            if (DateTime.UtcNow < s_stallWarningUtc) return;
+            if (!Directory.EnumerateFiles(CucliPaths.Queued, "*.json").Any()) return;
+
+            s_stallWarningUtc = DateTime.UtcNow.AddSeconds(60);
+            string blocker = OldestFile(CucliPaths.Waiting);
+            UnityEngine.Debug.LogWarning(
+                "[cucli] " + Directory.EnumerateFiles(CucliPaths.Queued, "*.json").Count()
+                + " job(s) are queued but the queue is blocked by a job parked in the waiting state ("
+                + (blocker == null ? "unknown" : Path.GetFileName(blocker))
+                + "). It is evicted automatically once it exceeds its timeout grace period.");
         }
 
         private static void ProcessNextControlJob()
