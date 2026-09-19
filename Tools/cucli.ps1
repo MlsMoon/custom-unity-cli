@@ -89,6 +89,7 @@ $Script:ErrorExitMap = @{
     'INVALID_PARAMETER'           = $Script:ExitInvalid
     'UNSUPPORTED_ACTION'          = $Script:ExitInvalid
     'EDITOR_COMMAND_NOT_FOUND'    = $Script:ExitInvalid
+    'JOB_INVALID'                 = $Script:ExitInvalid
     'MEMBER_NOT_FOUND'            = $Script:ExitInvalid
     'TYPE_NOT_FOUND'              = $Script:ExitInvalid
     'ASSET_NOT_FOUND'             = $Script:ExitInvalid
@@ -304,26 +305,68 @@ function Get-Heartbeat {
     return Read-JsonFile $path
 }
 
-function Get-HeartbeatAgeSeconds {
-    param($Heartbeat)
-    if ($null -eq $Heartbeat -or [string]::IsNullOrWhiteSpace($Heartbeat.timestampUtc)) { return $null }
+function Get-TimestampAgeSeconds {
+    param($Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $null }
     try {
         $stamp = [datetime]::Parse(
-            $Heartbeat.timestampUtc,
+            $Value,
             [System.Globalization.CultureInfo]::InvariantCulture,
             [System.Globalization.DateTimeStyles]::AdjustToUniversal -bor [System.Globalization.DateTimeStyles]::AssumeUniversal)
-        return ([datetime]::UtcNow - $stamp).TotalSeconds
+        $seconds = ([datetime]::UtcNow - $stamp).TotalSeconds
+        return $(if ($seconds -lt 0) { 0 } else { $seconds })
     } catch {
         return $null
     }
 }
 
+function Get-HeartbeatAgeSeconds {
+    param($Heartbeat)
+    if ($null -eq $Heartbeat) { return $null }
+    return Get-TimestampAgeSeconds $Heartbeat.timestampUtc
+}
+
+function Get-HeartbeatStateAgeSeconds {
+    <#
+        Age of the last MAIN-THREAD state sample.
+
+        This is the honest liveness number and it is not the same as the heartbeat's own timestamp.
+        The heartbeat is republished from a background timer so that it stays fresh even while the
+        main thread is blocked - which means a frozen Editor looks perfectly healthy if you only read
+        `timestampUtc`. Job execution runs on the main thread, so once this age grows the queue cannot
+        drain no matter how long a caller waits.
+    #>
+    param($Heartbeat)
+    if ($null -eq $Heartbeat) { return $null }
+    return Get-TimestampAgeSeconds $Heartbeat.stateSampledAtUtc
+}
+
 function Test-WorkerOnline {
-    param([string]$ProjectRoot, [int]$MaxAgeSeconds = 15)
+    <#
+        True only when the worker can actually execute a job.
+
+        Both timestamps must be fresh. Requiring the state sample as well is what stops the CLI from
+        queuing work into a frozen Editor and reporting success until a timeout - the failure mode
+        that makes a driving tool untrustworthy rather than merely broken.
+    #>
+    param([string]$ProjectRoot, [int]$MaxAgeSeconds = 15, [int]$MaxStateAgeSeconds = 5)
+
     $heartbeat = Get-Heartbeat $ProjectRoot
     $age = Get-HeartbeatAgeSeconds $heartbeat
-    if ($null -eq $age) { return $false }
-    return ($age -le $MaxAgeSeconds)
+    if ($null -eq $age -or $age -gt $MaxAgeSeconds) { return $false }
+
+    $stateAge = Get-HeartbeatStateAgeSeconds $heartbeat
+    # A heartbeat without a state sample is from an older worker; fall back to the timestamp alone.
+    if ($null -eq $stateAge) { return $true }
+    return ($stateAge -le $MaxStateAgeSeconds)
+}
+
+function Test-WorkerStalled {
+    param([string]$ProjectRoot, [int]$MaxStateAgeSeconds = 5)
+    $heartbeat = Get-Heartbeat $ProjectRoot
+    $stateAge = Get-HeartbeatStateAgeSeconds $heartbeat
+    if ($null -eq $stateAge) { return $false }
+    return ($stateAge -gt $MaxStateAgeSeconds)
 }
 
 #endregion
@@ -823,21 +866,33 @@ function Get-WorkerStallHint {
     param([string]$ProjectRoot)
 
     $heartbeat = Get-Heartbeat $ProjectRoot
-    if ($null -eq $heartbeat -or [string]::IsNullOrWhiteSpace($heartbeat.stateSampledAtUtc)) { return '' }
+    if ($null -eq $heartbeat) { return '' }
 
-    try {
-        $sampled = [datetime]::Parse(
-            $heartbeat.stateSampledAtUtc,
-            [System.Globalization.CultureInfo]::InvariantCulture,
-            [System.Globalization.DateTimeStyles]::AdjustToUniversal -bor [System.Globalization.DateTimeStyles]::AssumeUniversal)
-        $age = [int]([datetime]::UtcNow - $sampled).TotalSeconds
-    } catch {
-        return ''
+    # Prefer mainThreadTickAtUtc: it is stamped at the very top of every editor tick, before the
+    # worker's internal retry gate, so a transient IO fault cannot suppress this hint.
+    # stateSampledAtUtc is the fallback for a heartbeat written by an older worker.
+    $stateAge = $null
+    if ($heartbeat.PSObject.Properties['mainThreadTickAtUtc'] -and $heartbeat.mainThreadTickAtUtc) {
+        try {
+            $tick = [datetime]::Parse(
+                $heartbeat.mainThreadTickAtUtc,
+                [System.Globalization.CultureInfo]::InvariantCulture,
+                [System.Globalization.DateTimeStyles]::AdjustToUniversal -bor [System.Globalization.DateTimeStyles]::AssumeUniversal)
+            $stateAge = ([datetime]::UtcNow - $tick).TotalSeconds
+        } catch {
+            $stateAge = $null
+        }
     }
+    if ($null -eq $stateAge) { $stateAge = Get-HeartbeatStateAgeSeconds $heartbeat }
+    if ($null -eq $stateAge) { return '' }
 
+    $age = [int]$stateAge
     if ($age -lt 20) { return '' }
 
-    return " The Editor's main thread has not ticked for $age seconds, so the queue cannot drain: " +
+    $pending = if ($heartbeat.PSObject.Properties['pendingJobCount']) { [int]$heartbeat.pendingJobCount } else { 0 }
+    $pendingNote = if ($pending -gt 0) { " $pending job(s) are queued and unserviced." } else { '' }
+
+    return "$pendingNote The Editor's main thread has not ticked for $age seconds, so the queue cannot drain: " +
            "Unity is blocked in a synchronous operation or a modal dialog. Job execution happens on that " +
            "thread, so waiting longer will not help. Bring the Unity window to the front to check for a " +
            "dialog, or restart the Editor; queued jobs survive a restart."
@@ -1123,22 +1178,22 @@ function Invoke-HostStatus {
     $data = [ordered]@{
         worker = [ordered]@{
             online        = $online
+            # 'stalled' is the field to read when something looks alive but nothing happens: the
+            # heartbeat is fresh (background timer) yet the main thread has stopped sampling.
+            stalled       = (Test-WorkerStalled $ProjectRoot)
             heartbeatAgeSeconds = if ($null -eq $age) { $null } else { [math]::Round($age, 2) }
             # Liveness and state age are reported separately on purpose. The heartbeat timestamp is
             # refreshed by a background timer in the Editor, so it stays current even while Unity is
             # unfocused or importing; the Unity state fields are only re-sampled when the Editor's own
-            # update loop runs. A fresh heartbeat with an old state sample means "alive but busy",
-            # which is exactly what a caller needs to distinguish from "gone".
+            # update loop runs. A fresh heartbeat with an old state sample means "alive but not
+            # executing", which is exactly what a caller needs to distinguish from "gone" - and it is
+            # why Test-WorkerOnline requires both.
             stateSampledAtUtc = if ($heartbeat) { $heartbeat.stateSampledAtUtc } else { $null }
-            stateAgeSeconds = if ($heartbeat -and $heartbeat.stateSampledAtUtc) {
-                try {
-                    $sampled = [datetime]::Parse(
-                        $heartbeat.stateSampledAtUtc,
-                        [System.Globalization.CultureInfo]::InvariantCulture,
-                        [System.Globalization.DateTimeStyles]::AdjustToUniversal -bor [System.Globalization.DateTimeStyles]::AssumeUniversal)
-                    [math]::Round(([datetime]::UtcNow - $sampled).TotalSeconds, 2)
-                } catch { $null }
-            } else { $null }
+            stateAgeSeconds = if ($null -eq ($stateAge = Get-HeartbeatStateAgeSeconds $heartbeat)) {
+                $null
+            } else {
+                [math]::Round($stateAge, 2)
+            }
             sessionId     = if ($heartbeat) { $heartbeat.sessionId } else { $null }
             workerVersion = if ($heartbeat) { $heartbeat.workerVersion } else { $null }
             protocolVersion = if ($heartbeat) { $heartbeat.protocolVersion } else { $null }
@@ -1161,7 +1216,9 @@ function Invoke-HostStatus {
     }
 
     $warnings = @()
-    if (-not $online) {
+    if ($data.worker.stalled) {
+        $warnings += "The Editor's main thread has not ticked for $($data.worker.stateAgeSeconds) seconds: the heartbeat is fresh because a background timer publishes it, but no job can actually run. Unity is blocked in a synchronous operation or a modal dialog."
+    } elseif (-not $online) {
         $warnings += "The Unity Editor worker is not responding. Editor commands will fail with WORKER_UNAVAILABLE until Unity is open on this project."
     }
     if ($heartbeat -and $heartbeat.hasCompilationErrors) {
@@ -1298,6 +1355,19 @@ function Invoke-HostDoctor {
     $online = Test-WorkerOnline $ProjectRoot
     & $addCheck 'worker.heartbeat' $online `
         $(if ($online) { "Worker session $($heartbeat.sessionId) is alive." } else { "No fresh heartbeat under $(Get-RuntimeRoot $ProjectRoot)/worker." }) 'warning'
+
+    # Reported separately from the heartbeat because it is the failure that is hardest to notice: the
+    # heartbeat is fresh and every state field still says "idle", yet no job can run.
+    $stateAge = Get-HeartbeatStateAgeSeconds $heartbeat
+    if ($null -ne $stateAge) {
+        $stalled = ($stateAge -gt 5)
+        & $addCheck 'worker.stalled' (-not $stalled) `
+            $(if ($stalled) {
+                "The heartbeat is fresh but the Editor's main thread has not ticked for $([int]$stateAge)s, so no job can run. Unity is blocked in a synchronous operation or a modal dialog: bring the window to the front, or restart the Editor."
+            } else {
+                "The Editor's main thread is ticking (last sample $([int]$stateAge)s ago)."
+            }) 'error'
+    }
 
     if ($online) {
         $catalog = Get-RuntimeCatalog $ProjectRoot
@@ -1687,6 +1757,27 @@ function Write-JobOutcome {
     }
 }
 
+function Get-ProjectUnityProcesses {
+    <#
+        Unity processes whose command line names this project.
+
+        Needed because a live worker is NOT the only proof that the project is already open: while the
+        Editor is compiling or importing, its heartbeat can be stale enough to look offline, and
+        launching a second Editor then produces a second instance that can only show an error dialog.
+        The lock file and the process list are checked so `open` never does that.
+    #>
+    param([string]$ProjectRoot)
+    $found = @()
+    foreach ($process in (Get-Process -Name Unity -ErrorAction SilentlyContinue)) {
+        $commandLine = $null
+        try { $commandLine = (Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)" -ErrorAction Stop).CommandLine } catch { }
+        if ($commandLine -and $commandLine.IndexOf($ProjectRoot, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            $found += [pscustomobject]@{ pid = $process.Id; title = $process.MainWindowTitle }
+        }
+    }
+    return $found
+}
+
 function Invoke-HostOpen {
     param([string]$ProjectRoot, $Arguments, [string]$Format)
 
@@ -1695,6 +1786,24 @@ function Invoke-HostOpen {
         return Write-CucliResult -Success $true -Command 'open' -Action 'start' `
             -Data ([ordered]@{ alreadyOpen = $true; pid = $heartbeat.processId; unityVersion = $heartbeat.unityVersion }) `
             -Message 'A Unity Editor worker is already alive for this project.' -Format $Format
+    }
+
+    # The heartbeat is stale, but that does not mean the project is closed - a busy or blocked Editor
+    # stops refreshing it. Launching here is how a second instance gets created.
+    $lockFile = Join-Path $ProjectRoot 'Temp/UnityLockfile'
+    $processes = Get-ProjectUnityProcesses $ProjectRoot
+    if ((Test-Path -LiteralPath $lockFile) -or @($processes).Count -gt 0) {
+        $held = @($processes) | ForEach-Object { "pid=$($_.pid) '$($_.title)'" }
+        return Write-CucliResult -Success $true -Command 'open' -Action 'start' `
+            -Data ([ordered]@{
+                alreadyOpen = $true
+                launched = $false
+                lockFilePresent = (Test-Path -LiteralPath $lockFile)
+                processes = @($processes)
+                workerResponding = $false
+            }) `
+            -Warnings @("A Unity process already has this project open ($($held -join ', ')), but its worker is not responding, so nothing was launched. Look at that Editor window - it is probably blocked by a modal dialog or a long synchronous operation. If it is truly wedged, close it (saving your scene first) and run 'cucli open' again.") `
+            -Message 'The project is already open; refusing to launch a second Editor.' -Format $Format
     }
 
     $noLaunch = $Arguments.Payload.Contains('noLaunch') -and $Arguments.Payload['noLaunch']
@@ -2082,6 +2191,16 @@ function Invoke-JobDispatch {
     }
 
     if (-not (Test-WorkerOnline $ProjectRoot)) {
+        # Distinguish "no Editor" from "Editor is there but frozen". Queueing into a frozen worker
+        # would look like success and then time out, which is worse than refusing immediately.
+        if (Test-WorkerStalled $ProjectRoot) {
+            $stateAge = [int](Get-HeartbeatStateAgeSeconds (Get-Heartbeat $ProjectRoot))
+            return Write-CucliFailure -ErrorCode 'WORKER_UNAVAILABLE' `
+                -Message "The Unity Editor for this project is not executing: its main thread has not ticked for $stateAge seconds, so a queued job could never run. Unity is blocked in a synchronous operation or a modal dialog; bring the Editor window to the front to check, or restart it. The job was NOT queued." `
+                -Data ([ordered]@{ stalled = $true; stateAgeSeconds = $stateAge }) `
+                -Command $Group -Action $Action -Format $Format
+        }
+
         return Write-CucliFailure -ErrorCode 'WORKER_UNAVAILABLE' `
             -Message "No live Unity Editor worker for this project. Open the project (or run 'cucli open') and retry; run 'cucli status' for details." `
             -Command $Group -Action $Action -Format $Format

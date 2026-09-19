@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using UnityEditor;
 using UnityEngine;
@@ -46,6 +47,12 @@ namespace CustomUnityCli.Editor
         private static DateTime s_nextWarningUtc;
         private static DateTime s_nextStateSampleUtc;
 
+        /// <summary>Last time the editor loop turned. Written by the main thread, read by the timer.</summary>
+        private static volatile string s_mainThreadTickUtc;
+
+        /// <summary>Set by <see cref="PendingWorkExists"/> on the timer thread, consumed by the main thread.</summary>
+        private static volatile bool s_workPending;
+
         static CucliWorkerBootstrap()
         {
             if (AssetDatabase.IsAssetImportWorkerProcess()) return;
@@ -72,6 +79,7 @@ namespace CustomUnityCli.Editor
 
         private static void Update()
         {
+            s_mainThreadTickUtc = DateTime.UtcNow.ToString("O");
             if (DateTime.UtcNow < s_nextRetryUtc) return;
 
             try
@@ -88,6 +96,9 @@ namespace CustomUnityCli.Editor
 
                 CucliConsoleCapture.Flush();
                 CucliJobProcessor.Tick();
+                // The main thread has just drained whatever the timer thread was advertising, so the
+                // next pending-work sighting is allowed to nudge again.
+                s_workPending = false;
 
                 if (DateTime.UtcNow >= s_nextStateSampleUtc)
                 {
@@ -117,10 +128,79 @@ namespace CustomUnityCli.Editor
         {
             if (s_timer != null || s_snapshot == null) return;
             s_timer = new Timer(
-                _ => PublishHeartbeat(),
+                _ => OnTimerTick(),
                 null,
                 HeartbeatIntervalMilliseconds,
                 HeartbeatIntervalMilliseconds);
+        }
+
+        /// <summary>
+        /// Runs on a background thread every heartbeat interval. Two jobs, in this order:
+        ///
+        /// 1. Publish a liveness heartbeat, which must not depend on the editor loop turning - that
+        ///    is what stops "Unity is in the background" from looking like "Unity is gone".
+        /// 2. If work is queued, wake the editor loop.
+        ///
+        /// Without step 2 the job pump only runs from <see cref="EditorApplication.update"/>, and
+        /// Unity throttles that loop hard whenever the window is not focused. A CLI is used from CI,
+        /// from a script and from an agent- exactly the situations where nobody is looking at the
+        /// Editor - so a queued job could otherwise sit untouched until the user happened to click
+        /// back into Unity, and the caller would see only a bare timeout.
+        /// </summary>
+        private static void OnTimerTick()
+        {
+            PublishHeartbeat();
+
+            if (!PendingWorkExists()) return;
+            NudgeMainLoop();
+        }
+
+        /// <summary>Cheap directory probe. Runs off the main thread, so it touches only the filesystem.</summary>
+        private static bool PendingWorkExists()
+        {
+            try
+            {
+                return HasAnyJson(CucliPaths.Queued)
+                    || HasAnyJson(CucliPaths.Control)
+                    || HasAnyJson(CucliPaths.CancelRequests)
+                    || HasAnyJson(CucliPaths.Waiting);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private static bool HasAnyJson(string directory)
+        {
+            try
+            {
+                return Directory.Exists(directory) && Directory.EnumerateFiles(directory, "*.json").Any();
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Asks the editor loop to turn at least once, so a pending job is picked up without the
+        /// user having to focus the window. Guarded because Unity does not document this call as
+        /// thread-safe; if it refuses, the main thread still drains the queue whenever it next runs.
+        /// </summary>
+        private static void NudgeMainLoop()
+        {
+            if (s_workPending) return;
+            s_workPending = true;
+            try
+            {
+                EditorApplication.QueuePlayerLoopUpdate();
+            }
+            catch (Exception)
+            {
+                // Off-main-thread refusal is acceptable: the next natural tick still drains the queue.
+                s_workPending = false;
+            }
         }
 
         /// <summary>Builds the immutable state snapshot. Main thread only.</summary>
@@ -147,8 +227,33 @@ namespace CustomUnityCli.Editor
                 IsBatchMode = Application.isBatchMode,
                 ActiveScenePath = active.IsValid() ? active.path : string.Empty,
                 OpenSceneCount = SceneManager.sceneCount,
-                CommandCount = CucliCommandRegistry.Count
+                CommandCount = CucliCommandRegistry.Count,
+                MainThreadTickAtUtc = s_mainThreadTickUtc,
+                PendingJobCount = CountPendingJobs()
             };
+        }
+
+        /// <summary>Cheap enough to run once a second, and it lets callers distinguish busy from idle.</summary>
+        private static int CountPendingJobs()
+        {
+            return CountJson(CucliPaths.Queued)
+                + CountJson(CucliPaths.Control)
+                + CountJson(CucliPaths.CancelRequests)
+                + CountJson(CucliPaths.Waiting);
+        }
+
+        private static int CountJson(string directory)
+        {
+            try
+            {
+                return Directory.Exists(directory)
+                    ? Directory.EnumerateFiles(directory, "*.json").Count()
+                    : 0;
+            }
+            catch (Exception)
+            {
+                return 0;
+            }
         }
 
         /// <summary>

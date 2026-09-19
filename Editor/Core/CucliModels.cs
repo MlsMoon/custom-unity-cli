@@ -46,6 +46,21 @@ namespace CustomUnityCli.Editor
         /// liveness-fresh heartbeat can carry an older state sample, and callers must be able to tell
         /// the difference between "Unity is gone" and "Unity is busy".</summary>
         public string StateSampledAtUtc { get; set; }
+
+        /// <summary>
+        /// When <see cref="UnityEditor.EditorApplication.update"/> last ran.
+        ///
+        /// The background heartbeat writer keeps <see cref="TimestampUtc"/> fresh even while Unity's
+        /// editor loop is throttled or stopped (window unfocused, a modal dialog, a long import).
+        /// That makes the file a poor liveness signal on its own, and it makes a queued job sit
+        /// unserviced with no visible reason. This stamp is the honest signal: if it is old while
+        /// <see cref="TimestampUtc"/> is fresh, the worker is alive but its main loop is not
+        /// turning, and every job will be delayed until it does.
+        /// </summary>
+        public string MainThreadTickAtUtc { get; set; }
+
+        /// <summary>Number of jobs waiting to be serviced, so a caller can tell "busy" from "idle".</summary>
+        public int PendingJobCount { get; set; }
         public string ProjectPath { get; set; }
         public string ProjectName { get; set; }
         public string UnityVersion { get; set; }
