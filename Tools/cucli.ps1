@@ -401,6 +401,30 @@ function ConvertFrom-ArgumentValue {
     return $trimmed
 }
 
+function Test-LooksLikeOption {
+    <#
+        Decides whether the token following an option is that option's VALUE or a new option.
+
+        A bare "does it start with a dash?" test is wrong, and wrong in a way that fails silently:
+        Unity instance ids are routinely negative (an object's id is often something like -10844),
+        so `--instance-id -10844` would consume no value at all and the key would be set to $true.
+        The command then reports "an integer 'instanceId' is required", or worse - for an optional
+        parameter - quietly does nothing and still succeeds.
+
+        Negative numbers, therefore, are values. Everything else starting with a dash is an option.
+    #>
+    param([string]$Token)
+
+    if ([string]::IsNullOrEmpty($Token)) { return $false }
+    if (-not $Token.StartsWith('-')) { return $false }
+    if ($Token.Length -eq 1) { return $false }
+
+    # -1, -10844, -0.5, -.5, -1,2,3 and -1e3 are all values.
+    if ($Token -match '^-[\d.]') { return $false }
+
+    return $true
+}
+
 function Split-CucliArguments {
     <#
         Splits the raw argument list into positional tokens and a payload hashtable.
@@ -465,18 +489,22 @@ function Split-CucliArguments {
         if ($token.StartsWith('--timeout=')) { $result.Timeout = [int]$token.Substring(10); continue }
 
         if ($token.StartsWith('--')) {
-            $name = ConvertTo-CamelCase ($token.Substring(2))
+            # Split on '=' BEFORE deriving the key. Deriving it from the whole token turns
+            # `--instance-id=-10844` into the key `instanceId=-10844`, so the real key is never set
+            # and the command sees a missing parameter - or silently does nothing.
+            $equals = $token.IndexOf('=')
+            $rawName = if ($equals -gt 0) { $token.Substring(2, $equals - 2) } else { $token.Substring(2) }
+            $name = ConvertTo-CamelCase $rawName
             if ($name.Length -eq 0) { continue }
 
             # --flag, --flag=value or --flag value
-            $equals = $token.IndexOf('=')
             if ($equals -gt 0) {
                 Add-PayloadValue -Payload $result.Payload -Key $name -Value (ConvertFrom-ArgumentValue $token.Substring($equals + 1))
                 continue
             }
 
             $next = if ($index -lt $Raw.Count) { $Raw[$index] } else { $null }
-            if ($null -ne $next -and -not $next.StartsWith('-')) {
+            if ($null -ne $next -and -not (Test-LooksLikeOption $next)) {
                 Add-PayloadValue -Payload $result.Payload -Key $name -Value (ConvertFrom-ArgumentValue $next)
                 $index++
             } else {
@@ -488,7 +516,7 @@ function Split-CucliArguments {
         if ($token.StartsWith('-') -and $token.Length -gt 1) {
             $name = ConvertTo-CamelCase ($token.Substring(1))
             $next = if ($index -lt $Raw.Count) { $Raw[$index] } else { $null }
-            if ($null -ne $next -and -not $next.StartsWith('-')) {
+            if ($null -ne $next -and -not (Test-LooksLikeOption $next)) {
                 Add-PayloadValue -Payload $result.Payload -Key $name -Value (ConvertFrom-ArgumentValue $next)
                 $index++
             } else {

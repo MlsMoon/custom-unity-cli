@@ -814,7 +814,10 @@ namespace CustomUnityCli.Editor
             {
                 var args = new CucliArgs(reference);
 
-                int instanceId = args.GetInt("instanceID", args.GetInt("instance_id", 0));
+                // "instanceId" first: the CLI normalises --instance-id onto that spelling, so reading
+                // only "instanceID" silently produced 0 and the reference was dropped.
+                int instanceId = args.GetInt("instanceId",
+                    args.GetInt("instanceID", args.GetInt("instance_id", 0)));
                 if (instanceId != 0)
                 {
                     resolved = EditorUtility.InstanceIDToObject(instanceId);

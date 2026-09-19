@@ -62,7 +62,7 @@ namespace CustomUnityCli.Editor
 
         public override bool MutatesProject => true;
 
-        public override string[] Effects => new[] { "code.execute", "project.assets.write", "editor.state.write" };
+        public override string[] Effects => new[] { "editor.code.execute", "project.assets.write", "editor.state.write" };
 
         public override string ParametersSchemaJson => @"{
   ""type"": ""object"",
@@ -474,6 +474,16 @@ namespace CustomUnityCli.Editor
                     + " (raise maxOperations up to " + MaxBatchOperations + ").");
             }
 
+            // MCP accepts a "parallel" flag and then still runs the batch serially. We keep that
+            // contract and say so out loud, rather than implying concurrency we do not provide:
+            // Editor APIs are not thread-safe, so serial is the only correct behaviour here.
+            if (context.Input.GetBool("parallel", false))
+            {
+                context.Warn("parallel was requested but batch execution is strictly serial; "
+                    + "operations are applied one at a time, in order. The flag is accepted only for "
+                    + "compatibility and changes nothing.");
+            }
+
             var results = new JArray();
             int succeeded = 0;
             int failed = 0;
@@ -806,6 +816,23 @@ namespace CustomUnityCli.Editor
         /// for everyone. Loading it by name keeps the fallback compiler working where it exists and
         /// degrades to a clear message where it does not.
         /// </summary>
+        /// <summary>
+        /// Whether a Roslyn C# compiler is loaded in this Editor.
+        ///
+        /// Roslyn ships as a set of NuGet assemblies (Microsoft.CodeAnalysis, ...CSharp, Microsoft.CSharp)
+        /// that are NOT part of a stock Editor install, so it is probed rather than assumed - naming a
+        /// Roslyn type directly would need a compile-time reference this assembly must not carry. The
+        /// probe also lets the backend decision be stated explicitly: "the CodeDom provider is missing"
+        /// and "no compiler at all is present" are different problems with different fixes.
+        /// </summary>
+        private static bool RoslynAvailable()
+        {
+            return CucliOptional.HasType(
+                       "Microsoft.CodeAnalysis.CSharp", "Microsoft.CodeAnalysis.CSharp.CSharpCompilation")
+                   && CucliOptional.HasType(
+                       "Microsoft.CodeAnalysis", "Microsoft.CodeAnalysis.SyntaxTree");
+        }
+
         private static object CreateProvider(out string error)
         {
             error = null;
@@ -817,9 +844,16 @@ namespace CustomUnityCli.Editor
 
                 if (providerType == null)
                 {
-                    error = "The CodeDom C# provider (Microsoft.CSharp) is not available in this Editor, "
-                        + "and no Roslyn compiler was found either. Install the Roslyn package or use a "
-                        + "full Editor installation to run snippets.";
+                    error = RoslynAvailable()
+                        ? "The CodeDom C# provider (Microsoft.CSharp) is not available in this Editor. "
+                          + "Roslyn is loaded, but this build has no Roslyn execution backend wired, so "
+                          + "snippets cannot run here. Reach for 'cucli batch' with existing command "
+                          + "groups instead."
+                        : "Neither compiler backend is available: the CodeDom C# provider "
+                          + "(Microsoft.CSharp) is missing, and no Roslyn compiler "
+                          + "(Microsoft.CodeAnalysis.CSharp.CSharpCompilation) is loaded either. "
+                          + "Install the Roslyn assemblies under Assets/Plugins/Roslyn, or use a full "
+                          + "Editor installation, to run snippets.";
                     return null;
                 }
 

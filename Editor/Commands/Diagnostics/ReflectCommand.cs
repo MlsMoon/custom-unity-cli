@@ -90,6 +90,20 @@ namespace CustomUnityCli.Editor
             Type type = CucliReflection.FindType(requested.Trim(), out error);
             if (type == null)
             {
+                // A short name can be ambiguous rather than absent, and the two call for different
+                // fixes: one is a typo, the other is a namespace question. MCP reports this case as
+                // "ambiguous" plus the candidate list instead of guessing, so the same distinction is
+                // made here rather than collapsing both into "not found".
+                List<string> matches = AmbiguousTypeMatches(requested);
+                if (matches.Count > 1)
+                {
+                    return CucliCommandResult.Fail(
+                        CucliErrors.TargetAmbiguous,
+                        "'" + requested + "' matches " + matches.Count + " loaded types. Retry with a "
+                        + "namespace-qualified name; the candidates are in 'matches'.",
+                        new { typeName = requested, ambiguous = true, matches });
+                }
+
                 return CucliCommandResult.Fail(
                     CucliErrors.TypeNotFound, error ?? ("Type '" + requested + "' was not found."),
                     new { typeName = requested });
@@ -257,6 +271,56 @@ namespace CustomUnityCli.Editor
             return "class";
         }
 
+        /// <summary>
+        /// Full names of every loaded type whose short name equals <paramref name="requested"/>.
+        ///
+        /// Only consulted after a lookup has already failed, and only for a namespace-less name: it is
+        /// what turns an unhelpful "type not found" into the actionable "this name is ambiguous".
+        /// Capped, because a name such as <c>Object</c> would otherwise pull thousands of rows into a
+        /// single response.
+        /// </summary>
+        private static List<string> AmbiguousTypeMatches(string requested)
+        {
+            const int limit = 25;
+            var matches = new List<string>();
+            if (string.IsNullOrWhiteSpace(requested) || requested.IndexOf('.') >= 0) return matches;
+
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException exception)
+                {
+                    var loaded = new List<Type>();
+                    foreach (Type candidate in exception.Types)
+                    {
+                        if (candidate != null) loaded.Add(candidate);
+                    }
+
+                    types = loaded.ToArray();
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                foreach (Type type in types)
+                {
+                    if (type == null || type.IsGenericTypeDefinition) continue;
+                    if (!string.Equals(type.Name, requested, StringComparison.OrdinalIgnoreCase)) continue;
+                    string full = type.FullName;
+                    if (string.IsNullOrEmpty(full) || matches.Contains(full)) continue;
+                    matches.Add(full);
+                    if (matches.Count >= limit) return matches;
+                }
+            }
+
+            return matches;
+        }
+
         private static CucliCommandResult GetMember(CucliCommandContext context)
         {
             string typeName = context.Input.GetString("typeName") ?? context.Input.GetString("type_name");
@@ -365,11 +429,105 @@ namespace CustomUnityCli.Editor
                 }
             }
 
+            // Extension methods are deliberately not members of the type, which is exactly why a caller
+            // asking for one by bare name is surprised by a plain member miss. Resolve them before
+            // giving up, and label the hit so nobody mistakes it for an instance member.
+            MethodInfo extension = FindExtensionMethod(type, wanted);
+            if (extension != null)
+            {
+                return CucliCommandResult.Ok(new
+                {
+                    kind = "extensionMethod",
+                    name = wanted,
+                    type = CucliReflection.TypeName(type),
+                    declaredBy = CucliReflection.TypeName(extension.DeclaringType),
+                    isStatic = true,
+                    returnType = CucliValues.FriendlyName(extension.ReturnType),
+                    signature = Signature(extension),
+                    parameters = extension.GetParameters().Select(parameter => new
+                    {
+                        name = parameter.Name,
+                        type = CucliValues.FriendlyName(parameter.ParameterType),
+                        optional = parameter.IsOptional,
+                        hasDefault = parameter.HasDefaultValue,
+                        defaultValue = parameter.HasDefaultValue
+                            ? CucliDescribe.SafeToString(parameter.DefaultValue)
+                            : null
+                    }).ToArray()
+                });
+            }
+
             return CucliCommandResult.Fail(
                 CucliErrors.MemberNotFound,
                 "'" + wanted + "' is not a member of " + CucliReflection.TypeName(type)
-                + " or any of its base types. Use 'cucli reflect get-type --type-name "
-                + type.Name + "' to see what it declares.");
+                + " or any of its base types, and no extension method callable on it matches either. "
+                + "Use 'cucli reflect get-type --type-name " + type.Name + "' to see what it declares.");
+        }
+
+        /// <summary>
+        /// Finds a static extension method callable on <paramref name="target"/>: declared in a static
+        /// class carrying <see cref="System.Runtime.CompilerServices.ExtensionAttribute"/>, named
+        /// <paramref name="wanted"/>, with a first parameter the target is assignable to.
+        ///
+        /// Scans loaded assemblies rather than a curated list because extension methods on Unity types
+        /// arrive from whichever packages a project happens to include.
+        /// </summary>
+        private static MethodInfo FindExtensionMethod(Type target, string wanted)
+        {
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException exception)
+                {
+                    var loaded = new List<Type>();
+                    foreach (Type candidate in exception.Types)
+                    {
+                        if (candidate != null) loaded.Add(candidate);
+                    }
+
+                    types = loaded.ToArray();
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                foreach (Type type in types)
+                {
+                    // Extension methods can only live in a non-generic static class.
+                    if (type == null || !type.IsAbstract || !type.IsSealed) continue;
+                    if (!type.IsDefined(typeof(System.Runtime.CompilerServices.ExtensionAttribute), false))
+                    {
+                        continue;
+                    }
+
+                    MethodInfo[] methods;
+                    try
+                    {
+                        methods = type.GetMethods(
+                            BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly);
+                    }
+                    catch (Exception)
+                    {
+                        continue;
+                    }
+
+                    foreach (MethodInfo method in methods)
+                    {
+                        if (!string.Equals(method.Name, wanted, StringComparison.Ordinal)) continue;
+                        ParameterInfo[] parameters = method.GetParameters();
+                        if (parameters.Length == 0) continue;
+                        if (!parameters[0].ParameterType.IsAssignableFrom(target)) continue;
+                        return method;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static CucliCommandResult Search(CucliCommandContext context)

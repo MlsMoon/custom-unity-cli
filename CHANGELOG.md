@@ -122,4 +122,30 @@ In total **32 Editor command groups carrying 402 actions**, plus 9 offline group
 - Command types no longer have to be public. The registry constructs them by reflection, so both the
   package's own `internal sealed class` commands and internal project extensions register correctly.
 
+### Fixed
+
+All four found by running `cucli selftest` against the CLI itself.
+
+- **Negative numeric arguments were consumed as flags instead of values.** The parser decided that
+  any token starting with `-` began a new option, so `cucli object inspect --instance-id -10844` set
+  `instanceId` to `true` instead of to the id. Unity instance ids are routinely negative, so this
+  silently broke every space-separated `--instance-id` call, and would have broken any negative
+  `--position`, `--size`, `--value` or `--threshold` too. The visible symptom was a confusing
+  `TARGET_NOT_FOUND`; for an optional parameter it was worse, because the command reported success
+  while doing nothing. A leading `-` now starts an option only when what follows is not a number.
+- **`--option=value` derived the payload key from the whole token.** `--instance-id=-10844` produced
+  the key `instanceId=-10844`, so the real key was never set and the command saw a missing
+  parameter. The key is now taken from the text before the `=`.
+- **The self-test harness crashed while writing its report on PowerShell 7.6.** `@($list)` where
+  `$list` is a `System.Collections.Generic.List[object]` holding `PSCustomObject` rows throws
+  `ArgumentException: Argument types do not match`; `List[string]` and `List[psobject]` are
+  unaffected, which is why the trap only appeared once the collection held result rows. A run that
+  had completed all three tiers therefore reported nothing at all - no summary, no failure list, just
+  exit code 1. The collections are now enumerated directly.
+- **The self-test harness had no worker-readiness gate before Tier A.** Running it right after
+  changing code - exactly when a developer runs it - produced one identical `WORKER_UNAVAILABLE`
+  failure per action while a domain reload was in flight. One measured run reported 68 such failures
+  against 3 passes, which buries whatever real defect is underneath. Both tiers now wait, bounded and
+  with progress output, for the worker to answer, and report a single clear failure if it never does.
+
 [0.1.0]: https://github.com/igp/custom-unity-cli/releases/tag/v0.1.0

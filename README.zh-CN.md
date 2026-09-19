@@ -32,6 +32,7 @@
 >
 > - [Unity CLI reference](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)
 > - [Meet the Unity CLI](https://unity.com/blog/meet-the-unity-cli)
+> - [安装与上手 Unity CLI](https://unity.com/cn/resources/unity-pipeline-cli-technical-walkthrough)
 >
 > 本设计**没有考虑** Unity 6 的使用情况。文件队列传输、Domain Reload 契约与命令面都只在
 > 2022.3 上构建和测试过，不应假定它们在 Unity 6 上可用。

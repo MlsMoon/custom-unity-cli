@@ -36,6 +36,7 @@ generation of the Editor API.
 >
 > - [Unity CLI reference](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)
 > - [Meet the Unity CLI](https://unity.com/blog/meet-the-unity-cli)
+> - [Installing and using Unity CLI](https://unity.com/resources/unity-pipeline-cli-technical-walkthrough)
 >
 > Unity 6 has not been considered in this design. The file-queue transport, the domain-reload
 > contract and the command surface were all built and tested against 2022.3 only, so nothing here

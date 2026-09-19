@@ -3,7 +3,7 @@
   "name": "com.igp.custom-unity-cli",
   "version": "0.1.0",
   "protocolVersion": 1,
-  "generatedAtUtc": "2026-09-19T18:08:59.0807839Z",
+  "generatedAtUtc": "2026-09-19T18:13:34.2285163Z",
   "catalogHash": "a55b902b12ba45e6e02205c8ab6b58eb8da91ea74ce4fc5a7fbcc64351d92cba",
   "description": "Static declaration of the cucli surface. The 'offline' section is served by Tools/cucli.ps1 itself. The 'groups' section is generated from the compiled Editor worker by 'cucli commands export' so that 'cucli commands list' works even while Unity is closed; an empty array only degrades offline listing, never dispatch. Project-local commands are deliberately NOT written here: they go to registry.local.json inside the project's extension area, outside this package, so project code can never be published with the package.",
   "aliases": {

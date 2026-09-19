@@ -795,6 +795,17 @@ namespace CustomUnityCli.Editor
                 });
             }
 
+            // When the reachability graph is incomplete, "not reached" is not evidence of "unused".
+            // Listing those as candidates would invite deletions based on a partial scan, so they move
+            // to "unresolved" instead - the honest answer when the scan cannot support a verdict.
+            bool graphIncomplete = scan.Truncated || rootScanTruncated;
+            var unresolved = new JArray();
+            if (graphIncomplete)
+            {
+                foreach (JObject candidate in candidates) unresolved.Add(candidate);
+                candidates.Clear();
+            }
+
             CucliPage<JObject> page = CucliPaging.Slice(candidates, args, DefaultPageSize);
             JObject data = CucliPaging.Envelope(
                 page,
@@ -808,6 +819,9 @@ namespace CustomUnityCli.Editor
                     ["rootScanTruncated"] = rootScanTruncated,
                     ["reachableCount"] = reachable.Count,
                     ["candidateCount"] = candidates.Count,
+                    ["unresolved"] = unresolved,
+                    ["unresolvedCount"] = unresolved.Count,
+                    ["graphIncomplete"] = graphIncomplete,
                     ["allScenes"] = allScenes,
                     ["caveat"] = "Candidates only: runtime-loaded, Addressables, Resources and non-build "
                         + "scenes are not part of the reachability graph, so a listed asset may still be in use."
@@ -820,10 +834,20 @@ namespace CustomUnityCli.Editor
                 context.Warn("Prefab roots were capped at maxScan, so the reachability graph is partial.");
             }
 
-            return CucliCommandResult.Ok(
-                data,
-                "已扫描 " + assets.Count + " 个资产（根 " + roots.Count + " 个），"
-                + candidates.Count + " 个候选未被场景/预制体引用。");
+            if (graphIncomplete)
+            {
+                context.Warn("本次扫描不完整（scanTruncated=" + scan.Truncated + ", rootScanTruncated="
+                    + rootScanTruncated + "），因此不给出任何 unused 结论：" + unresolved.Count
+                    + " 个资产归入 unresolved。请提高 maxScan 后重跑再判断。");
+            }
+
+            string summary = graphIncomplete
+                ? "已扫描 " + assets.Count + " 个资产（根 " + roots.Count + " 个），但可达图不完整，"
+                  + "故不给出 unused 结论；" + unresolved.Count + " 个资产归入 unresolved。"
+                : "已扫描 " + assets.Count + " 个资产（根 " + roots.Count + " 个），"
+                  + candidates.Count + " 个候选未被场景/预制体引用。";
+
+            return CucliCommandResult.Ok(data, summary);
         }
 
         // ------------------------------------------------------------------ shared scan

@@ -170,7 +170,10 @@ namespace CustomUnityCli.Editor
         private static GameObject[] ByInstanceId(CucliArgs args, out string error)
         {
             error = null;
-            int id = args.GetInt("instanceId", args.GetInt("instance_id", args.GetInt("id", 0)));
+            // "instanceID" is accepted as well because several command groups emit that spelling in
+            // their results; feeding a result straight back in as an argument must keep working.
+            int id = args.GetInt("instanceId", args.GetInt("instanceID",
+                args.GetInt("instance_id", args.GetInt("id", 0))));
             if (id == 0)
             {
                 string text = Target(args);
