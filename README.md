@@ -141,6 +141,10 @@ for one group's parameter schema.
 
 The repository root **is** the Unity package root, so it can be installed either way.
 
+> **Check the target version first.** This package supports **Unity 2022.3**. If your project is on
+> **Unity 6**, use [Unity CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference) instead —
+> see the *Compatibility* section at the top of this file.
+
 **As a plugin folder (recommended — one directory, no manifest change):**
 
 ```powershell

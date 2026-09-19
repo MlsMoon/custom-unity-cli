@@ -134,6 +134,10 @@ CLI 写一个作业文件；Editor Worker 在下一个 update tick 取走执行�
 
 仓库根目录**就是**包根目录，所以两种装法都行。
 
+> **先确认目标版本。** 本包支持 **Unity 2022.3**。如果你的工程在 **Unity 6** 上，请改用
+> [Unity CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference) —— 详见本文开头的
+> **兼容性**一节。
+
 **作为 plugin 目录（推荐 —— 一个目录，不动 manifest）：**
 
 ```powershell
