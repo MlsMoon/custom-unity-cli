@@ -1,0 +1,69 @@
+# Unity-generated, never committed.
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]serSettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Never ignore .meta files: Unity needs them, and a package without them breaks on import.
+
+!*.meta
+
+# IDE and tooling state.
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# OS noise.
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local runtime state, in case the repo is cloned as a Unity project root.
+/Library/CustomUnityCli/
+
+# Crash reports and profiler output.
+sysinfo.txt
+crashlytics-build.properties
+*.apk
+*.aab
+*.app
+*.unitypackage
+
+# Editor local preferences that must not leak between machines.
+EditorSettings.asset
+
+# ---------------------------------------------------------------------------------------------
+# Project-local extensions must never be published with this package.
+#
+# The extension area defaults to <project>/Assets/CustomUnityCli.Extensions, which is already
+# outside this repository, so normally nothing here applies. These rules are a safety net for the
+# case where CUCLI_EXTENSIONS points inside the package, or someone drops project code into it by
+# hand. A project's own commands belong to the project, not to a published tool.
+# ---------------------------------------------------------------------------------------------
+# Anchored to the package root on purpose: an unanchored "Extensions/" would also ignore a
+# directory of that name at any depth, including a future Editor/Commands/Extensions/.
+/Local/
+/Extensions/
+/LocalExtensions/
+*.local.json
+registry.local.json
+extensions.json
+cucli.extension.json

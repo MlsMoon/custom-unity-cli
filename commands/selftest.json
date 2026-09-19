@@ -1,0 +1,241 @@
+{
+  "schemaVersion": "cucli.selftest/v1",
+  "description": "Declarative probes for 'cucli meta selftest'. The harness drives the real Tools/cucli.ps1 as a subprocess, so these tests exercise the same boundary a user or an agent hits - argument parsing, the result envelope and the exit-code contract - rather than reaching into the worker's internals. Project-specific values live here so the harness itself stays generic.",
+
+  "tiers": {
+    "contract": {
+      "requiresEditor": false,
+      "description": "CLI-only: parsing, aliases, output formats, envelope invariants and exit-code mapping. Runs with Unity closed."
+    },
+    "readonly": {
+      "requiresEditor": true,
+      "autoDerive": true,
+      "description": "Auto-derived from the live command catalog: every action of every group is invoked once with a bare payload, and the result must be a well-formed envelope whose error code is one of the declared 'acceptable' codes. EDITOR_COMMAND_EXCEPTION is always a failure, which is what catches unguarded exceptions across the whole surface."
+    },
+    "sandbox": {
+      "requiresEditor": true,
+      "description": "Hand-authored create -> inspect -> modify -> delete lifecycles, all confined to a scratch folder and a scratch scene, with teardown and leftover verification."
+    },
+    "slow": {
+      "requiresEditor": true,
+      "optIn": true,
+      "description": "Long operations: player builds, test suites, Play Mode, light baking, capture sequences. Opt in with -IncludeSlow."
+    }
+  },
+
+  "settings": {
+    "sandboxAssetFolder": "Assets/__cucli_selftest__",
+    "sandboxScenePath": "Assets/__cucli_selftest__/SelfTest.unity",
+    "sandboxObjectName": "__cucli_selftest_object__",
+    "defaultTimeoutSeconds": 60,
+    "maxCatalogActionsPerGroup": 400
+  },
+
+  "acceptableErrorCodes": [
+    "MISSING_PARAMETER",
+    "INVALID_PARAMETER",
+    "UNSUPPORTED_ACTION",
+    "TARGET_NOT_FOUND",
+    "TARGET_AMBIGUOUS",
+    "ASSET_NOT_FOUND",
+    "ASSET_EXISTS",
+    "MEMBER_NOT_FOUND",
+    "TYPE_NOT_FOUND",
+    "WRONG_MODE",
+    "CONFIRMATION_REQUIRED",
+    "OPTIONAL_PACKAGE_MISSING",
+    "WORKER_BUSY"
+  ],
+
+  "contract": [
+    { "id": "cli.version", "args": ["version"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["cliVersion", "packageRoot"] },
+    { "id": "cli.help", "args": ["help", "--format", "json"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["text"] },
+    { "id": "cli.help.bare", "args": [], "expectExit": 0, "expectStdoutContains": "USAGE" },
+    { "id": "cli.project", "args": ["project"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["projectRoot", "unityVersion"] },
+    { "id": "cli.status", "args": ["status"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["worker", "queues"] },
+
+    { "id": "commands.list", "args": ["commands", "list"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["groups", "offline"] },
+    { "id": "commands.groups", "args": ["commands", "groups"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["groups"] },
+    { "id": "commands.describe.known", "args": ["commands", "describe", "editor"], "expectExit": 0, "expectSuccess": true },
+    { "id": "commands.describe.unknown", "args": ["commands", "describe", "definitely_not_a_group"], "expectExit": 8, "expectSuccess": false, "expectErrorCode": "EDITOR_COMMAND_NOT_FOUND" },
+    { "id": "commands.unsupported", "args": ["commands", "frobnicate"], "expectExit": 8, "expectSuccess": false, "expectErrorCode": "UNSUPPORTED_ACTION" },
+
+    { "id": "dispatch.unknownGroup", "args": ["definitely_not_a_group", "list"], "expectExit": 8, "expectSuccess": false, "expectErrorCode": "EDITOR_COMMAND_NOT_FOUND" },
+    { "id": "dispatch.unknownAction", "args": ["editor", "definitely_not_an_action"], "expectExit": 8, "expectSuccess": false, "expectErrorCode": "UNSUPPORTED_ACTION" },
+
+    { "id": "job.list", "args": ["job", "list"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["jobs", "counts"] },
+    { "id": "job.status.missing", "args": ["job", "status", "00000000000000000000000000000000"], "expectExit": 8, "expectSuccess": false, "expectErrorCode": "JOB_INVALID" },
+    { "id": "job.result.missing", "args": ["job", "result", "00000000000000000000000000000000"], "expectExit": 8, "expectSuccess": false, "expectErrorCode": "JOB_INVALID" },
+    { "id": "job.status.noId", "args": ["job", "status"], "expectExit": 8, "expectSuccess": false, "expectErrorCode": "MISSING_PARAMETER" },
+
+    { "id": "logs.game", "args": ["logs", "game", "--tail", "3"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["source", "returned"] },
+    { "id": "logs.cli", "args": ["logs", "cli", "--tail", "3"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["source"] },
+    { "id": "logs.badSource", "args": ["logs", "definitely_not_a_source"], "expectExit": 2, "expectSuccess": false, "expectErrorCode": "USAGE_ERROR" },
+
+    { "id": "doctor.static", "args": ["doctor"], "expectExit": [0, 7], "expectDataPaths": ["checks", "projectRoot"] },
+
+    { "id": "format.json.envelope", "args": ["version", "--format", "json"], "expectExit": 0, "expectEnvelope": true },
+    { "id": "format.ndjson.frame", "args": ["version", "--format", "ndjson"], "expectExit": 0, "expectNdjsonFrame": true },
+    { "id": "format.redirect.defaultsToJson", "args": ["version"], "expectExit": 0, "expectEnvelope": true, "note": "stdout is redirected by the harness, so the CLI must choose json." },
+
+    { "id": "alias.describe.go", "args": ["commands", "describe", "go"], "expectExit": 0, "expectSuccess": true, "expectDataName": "object" },
+    { "id": "alias.describe.mat", "args": ["commands", "describe", "mat"], "expectExit": 0, "expectSuccess": true, "expectDataName": "material" },
+    { "id": "alias.describe.prof", "args": ["commands", "describe", "prof"], "expectExit": 0, "expectSuccess": true, "expectDataName": "profiler" },
+
+    { "id": "project.notFound", "args": ["status", "--project", "C:/definitely/not/a/unity/project"], "expectExit": 4, "expectSuccess": false, "expectErrorCode": "PROJECT_NOT_FOUND" }
+  ],
+
+  "sandbox": [
+    {
+      "id": "editor.lifecycle",
+      "group": "editor",
+      "steps": [
+        { "id": "ping", "args": ["editor", "ping"], "expectExit": 0, "expectSuccess": true, "capture": { "sessionId": "data.sessionId" } },
+        { "id": "state", "args": ["editor", "state"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["state", "openScenes", "worker"] },
+        { "id": "tool-list", "args": ["editor", "tool-list"], "expectExit": 0, "expectSuccess": true },
+        { "id": "tool-set", "args": ["editor", "tool", "--tool", "Move"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "tag-add", "args": ["editor", "tag-add", "--tag", "__cucli_selftest_tag__"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "tag-list", "args": ["editor", "tag-list"], "expectExit": 0, "expectSuccess": true },
+        { "id": "tag-remove", "args": ["editor", "tag-remove", "--tag", "__cucli_selftest_tag__"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "layer-add", "args": ["editor", "layer-add", "--layer", "__cucli_selftest_layer__"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "layer-list", "args": ["editor", "layer-list"], "expectExit": 0, "expectSuccess": true },
+        { "id": "layer-remove", "args": ["editor", "layer-remove", "--layer", "__cucli_selftest_layer__"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "selection-get", "args": ["editor", "selection-get"], "expectExit": 0, "expectSuccess": true }
+      ]
+    },
+    {
+      "id": "object.lifecycle",
+      "group": "object",
+      "steps": [
+        { "id": "create", "args": ["object", "create", "--name", "__cucli_selftest_object__", "--primitive", "cube"], "expectExit": 0, "expectSuccess": true, "mutating": true, "capture": { "instanceId": "data.instanceId", "name": "data.name" } },
+        { "id": "selection-set", "args": ["editor", "selection-set", "--target", "__cucli_selftest_object__"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "find", "args": ["object", "find", "--search-method", "by_name", "--search-term", "__cucli_selftest_object__"], "expectExit": 0, "expectSuccess": true },
+        { "id": "inspect", "args": ["object", "inspect", "--instance-id", "$instanceId", "--max-depth", "1", "--max-items", "8"], "expectExit": 0, "expectSuccess": true },
+        { "id": "get-property", "args": ["object", "get-property", "--instance-id", "$instanceId", "--component", "Transform", "--property", "localPosition"], "expectExit": 0, "expectSuccess": true },
+        { "id": "set-property", "args": ["object", "set-property", "--instance-id", "$instanceId", "--component", "Transform", "--property", "localPosition", "--value", "1,2,3"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "add-component", "args": ["object", "add", "--instance-id", "$instanceId", "--component", "Rigidbody"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "remove-component", "args": ["object", "remove", "--instance-id", "$instanceId", "--component", "Rigidbody"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "duplicate", "args": ["object", "duplicate", "--instance-id", "$instanceId"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "delete.requiresConfirm", "args": ["object", "delete", "--instance-id", "$instanceId"], "expectExit": 4, "expectSuccess": false, "expectErrorCode": "CONFIRMATION_REQUIRED" },
+        { "id": "delete", "args": ["object", "delete", "--instance-id", "$instanceId", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true }
+      ]
+    },
+    {
+      "id": "asset.lifecycle",
+      "group": "asset",
+      "steps": [
+        { "id": "create-folder", "args": ["asset", "create", "--asset-type", "folder", "--path", "Assets/__cucli_selftest__"], "expectExit": [0, 8], "expectSuccess": [true, false], "mutating": true, "note": "Already exists on a re-run; ASSET_EXISTS with force is equally correct." },
+        { "id": "create-folder.force", "args": ["asset", "create", "--asset-type", "folder", "--path", "Assets/__cucli_selftest__", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "get-info", "args": ["asset", "get-info", "--path", "Assets/__cucli_selftest__"], "expectExit": 0, "expectSuccess": true },
+        { "id": "search", "args": ["asset", "search", "--folder", "Assets/__cucli_selftest__", "--page-size", "5"], "expectExit": 0, "expectSuccess": true },
+        { "id": "search.paged", "args": ["asset", "search", "--folder", "Assets", "--page-size", "3", "--page-number", "1"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["total", "returned", "hasMore"] }
+      ]
+    },
+    {
+      "id": "material.lifecycle",
+      "group": "material",
+      "steps": [
+        { "id": "create", "args": ["material", "create", "--path", "Assets/__cucli_selftest__/SelfTest.mat", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "get-info", "args": ["material", "get-material-info", "--path", "Assets/__cucli_selftest__/SelfTest.mat"], "expectExit": 0, "expectSuccess": true },
+        { "id": "set-color", "args": ["material", "set-material-color", "--path", "Assets/__cucli_selftest__/SelfTest.mat", "--color", "#3366FF"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "delete", "args": ["asset", "delete", "--path", "Assets/__cucli_selftest__/SelfTest.mat", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true }
+      ]
+    },
+    {
+      "id": "shader.lifecycle",
+      "group": "shader",
+      "steps": [
+        { "id": "create", "args": ["shader", "create", "--path", "Assets/__cucli_selftest__/SelfTest.shader", "--template", "builtin", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "read", "args": ["shader", "read", "--path", "Assets/__cucli_selftest__/SelfTest.shader"], "expectExit": 0, "expectSuccess": true },
+        { "id": "delete", "args": ["shader", "delete", "--path", "Assets/__cucli_selftest__/SelfTest.shader", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true }
+      ]
+    },
+    {
+      "id": "script.lifecycle",
+      "group": "script",
+      "steps": [
+        { "id": "create", "args": ["script", "create", "--path", "Assets/__cucli_selftest__/SelfTestScript.cs", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true, "slow": true },
+        { "id": "read", "args": ["script", "read", "--path", "Assets/__cucli_selftest__/SelfTestScript.cs", "--max-chars", "4096"], "expectExit": 0, "expectSuccess": true },
+        { "id": "get-sha", "args": ["script", "get-sha", "--path", "Assets/__cucli_selftest__/SelfTestScript.cs"], "expectExit": 0, "expectSuccess": true, "capture": { "sha": "data.sha256" } },
+        { "id": "validate", "args": ["script", "validate", "--path", "Assets/__cucli_selftest__/SelfTestScript.cs"], "expectExit": 0, "expectSuccess": true },
+        { "id": "delete", "args": ["script", "delete", "--path", "Assets/__cucli_selftest__/SelfTestScript.cs", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true, "slow": true }
+      ]
+    },
+    {
+      "id": "texture.lifecycle",
+      "group": "texture",
+      "steps": [
+        { "id": "create", "args": ["texture", "create", "--path", "Assets/__cucli_selftest__/SelfTest.png", "--width", "16", "--height", "16", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "apply-pattern", "args": ["texture", "apply-pattern", "--path", "Assets/__cucli_selftest__/SelfTest.png", "--pattern", "checker", "--cell-size", "4", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "delete", "args": ["asset", "delete", "--path", "Assets/__cucli_selftest__/SelfTest.png", "--force"], "expectExit": 0, "expectSuccess": true, "mutating": true }
+      ]
+    },
+    {
+      "id": "console.lifecycle",
+      "group": "console",
+      "steps": [
+        { "id": "clear", "args": ["console", "clear"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "get", "args": ["console", "get", "--page-size", "5"], "expectExit": 0, "expectSuccess": true },
+        { "id": "get.filtered", "args": ["console", "get", "--level", "error", "--page-size", "5"], "expectExit": 0, "expectSuccess": true }
+      ]
+    },
+    {
+      "id": "code.lifecycle",
+      "group": "code",
+      "steps": [
+        { "id": "run", "args": ["code", "run", "--code", "return Application.unityVersion;"], "expectExit": 0, "expectSuccess": true, "slow": true },
+        { "id": "batch", "args": ["code", "batch", "--operations", "[{\"tool\":\"editor\",\"params\":{\"action\":\"ping\"}}]"], "expectExit": 0, "expectSuccess": true, "slow": true }
+      ]
+    },
+    {
+      "id": "reflect.lifecycle",
+      "group": "reflect",
+      "steps": [
+        { "id": "get-type", "args": ["reflect", "get-type", "--type", "UnityEngine.Transform"], "expectExit": 0, "expectSuccess": true },
+        { "id": "get-member", "args": ["reflect", "get-member", "--type", "UnityEngine.Transform", "--member", "position"], "expectExit": 0, "expectSuccess": true },
+        { "id": "search", "args": ["reflect", "search", "--query", "Transform"], "expectExit": 0, "expectSuccess": true }
+      ]
+    },
+    {
+      "id": "refresh.lifecycle",
+      "group": "refresh",
+      "steps": [
+        { "id": "status", "args": ["refresh", "status"], "expectExit": 0, "expectSuccess": true },
+        { "id": "assets", "args": ["refresh", "assets"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+        { "id": "wait", "args": ["refresh", "wait", "--timeout-seconds", "120"], "expectExit": 0, "expectSuccess": true, "slow": true }
+      ]
+    },
+    {
+      "id": "meta.lifecycle",
+      "group": "meta",
+      "steps": [
+        { "id": "catalog", "args": ["meta", "catalog"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["commands", "catalogHash", "actionCount"] },
+        { "id": "environment", "args": ["meta", "environment"], "expectExit": 0, "expectSuccess": true },
+        { "id": "doctor", "args": ["meta", "doctor"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["commandCount", "catalogHash"] },
+        { "id": "schema", "args": ["meta", "schema", "--group", "object"], "expectExit": 0, "expectSuccess": true, "expectDataPaths": ["schema", "actions"] },
+        { "id": "schema.unknown", "args": ["meta", "schema", "--group", "definitely_not_a_group"], "expectExit": 8, "expectSuccess": false, "expectErrorCode": "EDITOR_COMMAND_NOT_FOUND" }
+      ]
+    }
+  ],
+
+  "teardown": [
+    { "id": "sandbox.closeDirtyScenes", "args": ["scene", "close-scene", "--all", "--discard"], "optional": true },
+    { "id": "sandbox.deleteFolder", "args": ["asset", "delete", "--path", "Assets/__cucli_selftest__", "--force", "--recursive"], "optional": true }
+  ],
+
+  "leftoverChecks": [
+    { "id": "leftover.folder", "args": ["asset", "get-info", "--path", "Assets/__cucli_selftest__"], "expectNonZeroExit": true, "note": "The sandbox folder must be gone after teardown." }
+  ],
+
+  "slow": [
+    { "id": "slow.playMode", "args": ["editor", "play"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+    { "id": "slow.playState", "args": ["editor", "state"], "expectExit": 0, "expectSuccess": true },
+    { "id": "slow.stopPlayMode", "args": ["editor", "stop"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+    { "id": "slow.compileWait", "args": ["refresh", "compile", "--wait", "--timeout-seconds", "600"], "expectExit": 0, "expectSuccess": true, "mutating": true },
+    { "id": "slow.profilerStart", "args": ["profiler", "start"], "expectExit": [0, 8], "mutating": true },
+    { "id": "slow.profilerStop", "args": ["profiler", "stop"], "expectExit": [0, 8], "mutating": true },
+    { "id": "slow.testRun", "args": ["test", "run", "--mode", "editmode", "--detach"], "expectExit": [0, 8], "mutating": true },
+    { "id": "slow.packageList", "args": ["package", "list-packages", "--page-size", "10"], "expectExit": 0, "expectSuccess": true },
+    { "id": "slow.buildPlatform", "args": ["build", "platform"], "expectExit": [0, 8] }
+  ]
+}

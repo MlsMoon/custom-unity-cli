@@ -1,0 +1,4212 @@
+{
+  "schemaVersion": "cucli.command-registry/v1",
+  "name": "com.igp.custom-unity-cli",
+  "version": "0.1.0",
+  "protocolVersion": 1,
+  "generatedAtUtc": "2026-09-19T17:42:16.3410192Z",
+  "catalogHash": "553fea54dbff73a5c7eeee3302582911f979072d10ac8c68da303e16c8a31c30",
+  "description": "Static declaration of the cucli surface. The 'offline' section is served by Tools/cucli.ps1 itself. The 'groups' section is generated from the compiled Editor worker by 'cucli commands export' so that 'cucli commands list' works even while Unity is closed; an empty array only degrades offline listing, never dispatch. Project-local commands are deliberately NOT written here: they go to registry.local.json inside the project's extension area, outside this package, so project code can never be published with the package.",
+  "aliases": {
+    "go": "object",
+    "obj": "object",
+    "comp": "object",
+    "component": "object",
+    "sc": "scene",
+    "pre": "prefab",
+    "mat": "material",
+    "sh": "shader",
+    "tex": "texture",
+    "script": "script",
+    "anim": "animation",
+    "phys": "physics",
+    "pb": "probuilder",
+    "prof": "profiler",
+    "pkg": "package",
+    "cap": "capture",
+    "rec": "recorder",
+    "con": "console",
+    "test": "test"
+  },
+  "controlActions": [
+    "editor/stop",
+    "editor/pause"
+  ],
+  "offline": [
+    {
+      "name": "project",
+      "summary": "Report where the CLI thinks the project is, its Unity version and whether the worker is alive.",
+      "requiresEditor": false,
+      "requiredMode": "offline",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "actions": [
+        {
+          "name": "show",
+          "summary": "Project root, Unity version, package root and worker status."
+        }
+      ]
+    },
+    {
+      "name": "status",
+      "summary": "Worker heartbeat, queue depths and which catalog is in use.",
+      "requiresEditor": false,
+      "requiredMode": "offline",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "actions": [
+        {
+          "name": "show",
+          "summary": "Combined worker and queue status."
+        }
+      ]
+    },
+    {
+      "name": "doctor",
+      "summary": "Diagnose the project, package, worker, Unity install and static/runtime registry drift.",
+      "requiresEditor": false,
+      "requiredMode": "offline",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "actions": [
+        {
+          "name": "check",
+          "summary": "Static checks only; never starts Unity."
+        },
+        {
+          "name": "deep",
+          "summary": "Adds a full CLI -> queue -> Editor -> result round trip."
+        }
+      ]
+    },
+    {
+      "name": "logs",
+      "summary": "Tail a log source without starting Unity.",
+      "requiresEditor": false,
+      "requiredMode": "offline",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "actions": [
+        {
+          "name": "game",
+          "summary": "Tail <project>/log.txt."
+        },
+        {
+          "name": "cli",
+          "summary": "Tail the CLI's own ndjson log."
+        },
+        {
+          "name": "console",
+          "summary": "Tail the captured Editor console as ndjson."
+        }
+      ]
+    },
+    {
+      "name": "commands",
+      "summary": "Inspect the command catalog and refresh the static registry.",
+      "requiresEditor": false,
+      "requiredMode": "offline",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "actions": [
+        {
+          "name": "list",
+          "summary": "List every group with its actions and safety metadata."
+        },
+        {
+          "name": "describe",
+          "summary": "Show one group's full declaration, including its parameter schema."
+        },
+        {
+          "name": "groups",
+          "summary": "Print group names only."
+        },
+        {
+          "name": "export",
+          "summary": "Regenerate commands/registry.json from the compiled worker (requires Unity)."
+        }
+      ]
+    },
+    {
+      "name": "job",
+      "summary": "Inspect and control queued Editor work.",
+      "requiresEditor": false,
+      "requiredMode": "offline",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "actions": [
+        {
+          "name": "list",
+          "summary": "List recent jobs grouped by queue state."
+        },
+        {
+          "name": "status",
+          "summary": "Show one job's queue state and result if terminal."
+        },
+        {
+          "name": "wait",
+          "summary": "Block until a job reaches a terminal state."
+        },
+        {
+          "name": "result",
+          "summary": "Print a finished job's result payload."
+        },
+        {
+          "name": "cancel",
+          "summary": "Request cancellation at the next step boundary."
+        },
+        {
+          "name": "clean",
+          "summary": "Delete terminal job files."
+        }
+      ]
+    },
+    {
+      "name": "open",
+      "summary": "Launch Unity for this project, preferring an already-running Unity Hub instance.",
+      "requiresEditor": false,
+      "requiredMode": "offline",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "actions": [
+        {
+          "name": "start",
+          "summary": "Launch Unity; optionally wait for the worker to come up."
+        }
+      ]
+    },
+    {
+      "name": "extend",
+      "summary": "The project-local extension area, where this project grows its own command groups. Never published with the package.",
+      "requiresEditor": false,
+      "requiredMode": "offline",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "actions": [
+        {
+          "name": "path",
+          "summary": "Print the extension root, its manifest and its local registry path."
+        },
+        {
+          "name": "list",
+          "summary": "List the extension folder, its source files and the project-local command groups."
+        },
+        {
+          "name": "init",
+          "summary": "Create the extension folder with its manifest and README. Works with Unity closed."
+        }
+      ]
+    },
+    {
+      "name": "version",
+      "summary": "Print CLI, package and PowerShell versions.",
+      "requiresEditor": false,
+      "requiredMode": "offline",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "actions": [
+        {
+          "name": "show",
+          "summary": "Version summary."
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "animation",
+      "summary": "Animation clips (curves, events, presets), AnimatorControllers (states, transitions, parameters, layers, blend trees) and Animator runtime control.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "project.assets.read",
+        "scene.animator.write"
+      ],
+      "actions": [
+        {
+          "name": "clip_create",
+          "summary": "Create an AnimationClip asset."
+        },
+        {
+          "name": "clip_get_info",
+          "summary": "Read the clip settings, curve bindings and events with bounded keyframe counts."
+        },
+        {
+          "name": "clip_add_curve",
+          "summary": "Append keyframes to a float curve."
+        },
+        {
+          "name": "clip_set_curve",
+          "summary": "Replace a float curve."
+        },
+        {
+          "name": "clip_set_vector_curve",
+          "summary": "Write the three component curves of a vector property."
+        },
+        {
+          "name": "clip_assign",
+          "summary": "Assign the clip to an Animator."
+        },
+        {
+          "name": "clip_add_event",
+          "summary": "Append an AnimationEvent."
+        },
+        {
+          "name": "clip_remove_event",
+          "summary": "Remove AnimationEvents by index or by function name."
+        },
+        {
+          "name": "clip_create_preset",
+          "summary": "Generate a clip from one of the fifteen procedural presets."
+        },
+        {
+          "name": "controller_create",
+          "summary": "Create an AnimatorController asset."
+        },
+        {
+          "name": "controller_add_state",
+          "summary": "Add a state to a layer, optionally with a motion clip."
+        },
+        {
+          "name": "controller_add_transition",
+          "summary": "Add a transition, including from AnyState."
+        },
+        {
+          "name": "controller_add_parameter",
+          "summary": "Add a controller parameter."
+        },
+        {
+          "name": "controller_get_info",
+          "summary": "Read layers, states, transitions and parameters."
+        },
+        {
+          "name": "controller_assign",
+          "summary": "Assign the controller to an Animator."
+        },
+        {
+          "name": "controller_add_layer",
+          "summary": "Append a layer with a weight and blending mode."
+        },
+        {
+          "name": "controller_remove_layer",
+          "summary": "Remove a layer by index or name."
+        },
+        {
+          "name": "controller_set_layer_weight",
+          "summary": "Set one layer weight."
+        },
+        {
+          "name": "controller_create_blend_tree_1d",
+          "summary": "Create a 1D blend tree state."
+        },
+        {
+          "name": "controller_create_blend_tree_2d",
+          "summary": "Create a 2D blend tree state."
+        },
+        {
+          "name": "controller_add_blend_tree_child",
+          "summary": "Add a motion child to a blend tree."
+        },
+        {
+          "name": "animator_get_info",
+          "summary": "Read the Animator state, parameters, layers and clips."
+        },
+        {
+          "name": "animator_get_parameter",
+          "summary": "Read one Animator parameter."
+        },
+        {
+          "name": "animator_play",
+          "summary": "Play a state by name. Requires Play Mode."
+        },
+        {
+          "name": "animator_crossfade",
+          "summary": "Cross-fade to a state. Requires Play Mode."
+        },
+        {
+          "name": "animator_set_parameter",
+          "summary": "Write one Animator parameter."
+        },
+        {
+          "name": "animator_set_speed",
+          "summary": "Set the Animator speed."
+        },
+        {
+          "name": "animator_set_enabled",
+          "summary": "Enable or disable the Animator component."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "clip_create",
+              "clip_get_info",
+              "clip_add_curve",
+              "clip_set_curve",
+              "clip_set_vector_curve",
+              "clip_assign",
+              "clip_add_event",
+              "clip_remove_event",
+              "clip_create_preset",
+              "controller_create",
+              "controller_add_state",
+              "controller_add_transition",
+              "controller_add_parameter",
+              "controller_get_info",
+              "controller_assign",
+              "controller_add_layer",
+              "controller_remove_layer",
+              "controller_set_layer_weight",
+              "controller_create_blend_tree_1d",
+              "controller_create_blend_tree_2d",
+              "controller_add_blend_tree_child",
+              "animator_get_info",
+              "animator_get_parameter",
+              "animator_play",
+              "animator_crossfade",
+              "animator_set_parameter",
+              "animator_set_speed",
+              "animator_set_enabled"
+            ],
+            "default": "clip_create"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Parameter envelope; its keys are merged with the outer keys, and outer keys win."
+          },
+          "clipPath": {
+            "type": "string",
+            "description": "AnimationClip asset path; '.anim' is appended when missing."
+          },
+          "controllerPath": {
+            "type": "string",
+            "description": "AnimatorController asset path; '.controller' is appended when missing."
+          },
+          "name": {
+            "type": "string",
+            "description": "action=clip_create: clip name, defaulting to the file name."
+          },
+          "length": {
+            "type": "number",
+            "default": 1,
+            "description": "action=clip_create: stop time."
+          },
+          "frameRate": {
+            "type": "number",
+            "default": 60,
+            "description": "action=clip_create: clip frame rate."
+          },
+          "loop": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=clip_create / clip_create_preset: circular clip."
+          },
+          "propertyPath": {
+            "type": "string",
+            "description": "action=clip_add_curve / clip_set_curve: e.g. localPosition.x."
+          },
+          "property": {
+            "type": "string",
+            "enum": [
+              "localPosition",
+              "localEulerAngles",
+              "localScale"
+            ],
+            "description": "action=clip_set_vector_curve."
+          },
+          "relativePath": {
+            "type": "string",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "default": "Transform",
+            "description": "action=clip_* curve: the bound component type."
+          },
+          "keys": {
+            "type": "array",
+            "items": {},
+            "description": "action=clip_*: [time, value] pairs or {time, value, inTangent, outTangent, inWeight, outWeight} objects."
+          },
+          "target": {
+            "type": "string",
+            "description": "action=clip_assign / controller_assign / animator_*: GameObject name, path or instance id."
+          },
+          "searchMethod": {
+            "type": "string",
+            "enum": [
+              "by_id_or_name_or_path",
+              "by_id",
+              "by_name",
+              "by_path"
+            ]
+          },
+          "time": {
+            "type": "number",
+            "description": "action=clip_add_event: event time; clip_remove_event: optional filter."
+          },
+          "functionName": {
+            "type": "string",
+            "description": "action=clip_add_event / clip_remove_event: the event callback name."
+          },
+          "stringParameter": {
+            "type": "string",
+            "default": ""
+          },
+          "floatParameter": {
+            "type": "number",
+            "default": 0
+          },
+          "intParameter": {
+            "type": "integer",
+            "default": 0
+          },
+          "eventIndex": {
+            "type": "integer",
+            "description": "action=clip_remove_event: index, preferred over functionName."
+          },
+          "preset": {
+            "type": "string",
+            "enum": [
+              "bounce",
+              "rotate",
+              "pulse",
+              "fade",
+              "shake",
+              "hover",
+              "spin",
+              "sway",
+              "bob",
+              "wiggle",
+              "blink",
+              "slide_in",
+              "elastic",
+              "grow",
+              "shrink"
+            ],
+            "description": "action=clip_create_preset."
+          },
+          "duration": {
+            "type": "number",
+            "default": 1
+          },
+          "amplitude": {
+            "type": "number",
+            "default": 1
+          },
+          "offset": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "action=clip_create_preset: [x,y,z] base offset."
+          },
+          "stateName": {
+            "type": "string"
+          },
+          "layerIndex": {
+            "type": "integer",
+            "default": 0
+          },
+          "layerName": {
+            "type": "string"
+          },
+          "speed": {
+            "type": "number",
+            "default": 1
+          },
+          "isDefault": {
+            "type": "boolean",
+            "default": false
+          },
+          "fromState": {
+            "type": "string",
+            "description": "action=controller_add_transition; AnyState / Any enable an AnyState transition."
+          },
+          "toState": {
+            "type": "string"
+          },
+          "hasExitTime": {
+            "type": "boolean",
+            "default": true
+          },
+          "exitTime": {
+            "type": "number",
+            "default": 0.75
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "parameterName": {
+            "type": "string"
+          },
+          "parameterType": {
+            "type": "string",
+            "enum": [
+              "float",
+              "int",
+              "integer",
+              "bool",
+              "boolean",
+              "trigger"
+            ]
+          },
+          "defaultValue": {
+            "description": "action=controller_add_parameter: number, integer or bool."
+          },
+          "weight": {
+            "type": "number",
+            "default": 1
+          },
+          "blendingMode": {
+            "type": "string",
+            "enum": [
+              "override",
+              "additive"
+            ]
+          },
+          "blendParameter": {
+            "type": "string"
+          },
+          "blendParameterX": {
+            "type": "string"
+          },
+          "blendParameterY": {
+            "type": "string"
+          },
+          "blendType": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "number"
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "layer": {
+            "type": "integer",
+            "default": -1,
+            "description": "action=animator_play / animator_crossfade: Animator layer index; -1 means the current layer."
+          },
+          "value": {
+            "description": "action=animator_set_parameter."
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 100
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "asset",
+      "summary": "Work with project assets: import, create, modify, delete, duplicate, move/rename, search, describe, folders, components.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "import",
+          "summary": "Reimport an asset from disk."
+        },
+        {
+          "name": "create",
+          "summary": "Create an asset (folder, material, physicsmaterial, scriptableobject, textasset, animationclip, texture2d, rendertexture, scene, json)."
+        },
+        {
+          "name": "modify",
+          "summary": "Write serialized fields on an existing asset."
+        },
+        {
+          "name": "delete",
+          "summary": "Delete an asset or folder. Requires force=true."
+        },
+        {
+          "name": "duplicate",
+          "summary": "Copy an asset to a new path."
+        },
+        {
+          "name": "move",
+          "summary": "Move an asset to another folder."
+        },
+        {
+          "name": "rename",
+          "summary": "Rename an asset in place."
+        },
+        {
+          "name": "search",
+          "summary": "Page through assets filtered by folder, name, type and modification date."
+        },
+        {
+          "name": "get_info",
+          "summary": "Describe one asset without serialising its contents."
+        },
+        {
+          "name": "create_folder",
+          "summary": "Create a folder and every missing parent."
+        },
+        {
+          "name": "get_components",
+          "summary": "List the component types on a prefab or model asset."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "import",
+              "create",
+              "modify",
+              "delete",
+              "duplicate",
+              "move",
+              "rename",
+              "search",
+              "get_info",
+              "create_folder",
+              "get_components"
+            ],
+            "default": "import"
+          },
+          "path": {
+            "type": "string",
+            "description": "Target asset path. For search: optional folder scope.",
+            "aliases": [
+              "assetPath",
+              "asset_path"
+            ]
+          },
+          "destination": {
+            "type": "string",
+            "description": "action=duplicate/move/rename: target path.",
+            "aliases": [
+              "destinationPath",
+              "destination_path"
+            ]
+          },
+          "assetType": {
+            "type": "string",
+            "aliases": [
+              "asset_type"
+            ],
+            "description": "action=create: folder, material, physicsmaterial, scriptableobject/so, textasset, animationclip, texture2d, rendertexture, scene, json."
+          },
+          "properties": {
+            "type": "object",
+            "description": "action=create/modify: member name to value."
+          },
+          "contents": {
+            "type": "string",
+            "description": "action=create: text payload for textasset/json."
+          },
+          "name": {
+            "type": "string",
+            "description": "action=create: file name when path is only a folder."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=delete/import: confirm the destructive or forced operation."
+          },
+          "generatePreview": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "generate_preview"
+            ]
+          },
+          "searchPattern": {
+            "type": "string",
+            "aliases": [
+              "search_pattern"
+            ],
+            "description": "action=search: raw AssetDatabase filter fragment."
+          },
+          "filterType": {
+            "type": "string",
+            "aliases": [
+              "filter_type"
+            ],
+            "description": "action=search: type filter, e.g. Material or t:Material."
+          },
+          "filterName": {
+            "type": "string",
+            "aliases": [
+              "filter_name",
+              "nameFilter",
+              "name_filter"
+            ],
+            "description": "action=search: file name substring."
+          },
+          "filterDateAfter": {
+            "type": "string",
+            "aliases": [
+              "filter_date_after"
+            ],
+            "description": "action=search: ISO 8601 lower bound on LastWriteTimeUtc."
+          },
+          "filterDateBefore": {
+            "type": "string",
+            "aliases": [
+              "filter_date_before"
+            ],
+            "description": "action=search: ISO 8601 upper bound on LastWriteTimeUtc."
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 50,
+            "aliases": [
+              "page_size"
+            ]
+          },
+          "pageNumber": {
+            "type": "integer",
+            "default": 1,
+            "aliases": [
+              "page_number"
+            ]
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          },
+          "maxStringLength": {
+            "type": "integer",
+            "default": 4096,
+            "aliases": [
+              "max_string_length"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "build",
+      "summary": "Player builds and build settings: build, poll status, switch platform, read/write player settings, build scenes, named build profiles and batch builds.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": true,
+      "optionalPackage": null,
+      "effects": [
+        "project.build",
+        "project.settings.write",
+        "project.assets.write",
+        "editor.state.write"
+      ],
+      "actions": [
+        {
+          "name": "status",
+          "summary": "Report a build or batch job by job_id (defaults to the most recent one). Read-only."
+        },
+        {
+          "name": "build",
+          "summary": "Start a player build. Returns job_id and pollInterval immediately."
+        },
+        {
+          "name": "platform",
+          "summary": "Read or switch the active build target and its subtarget."
+        },
+        {
+          "name": "settings",
+          "summary": "Read or write a PlayerSettings entry for the active target."
+        },
+        {
+          "name": "scenes",
+          "summary": "Read or write EditorBuildSettings.scenes. Reading is paged."
+        },
+        {
+          "name": "profiles",
+          "summary": "List, read, save or activate named build configurations."
+        },
+        {
+          "name": "batch",
+          "summary": "Build several targets one after another. Returns job_id and pollInterval immediately."
+        },
+        {
+          "name": "cancel",
+          "summary": "Cancel a batch job. Single-target builds cannot be cancelled."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "build",
+              "platform",
+              "settings",
+              "scenes",
+              "profiles",
+              "batch",
+              "cancel"
+            ],
+            "default": "status"
+          },
+          "jobId": {
+            "type": "string",
+            "description": "action=status/cancel: job handle (job_id)."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "Alias of 'jobId'."
+          },
+          "target": {
+            "type": "string",
+            "description": "windows64|windows|osx|linux64|android|ios|webgl|uwp|tvos or a BuildTarget name."
+          },
+          "outputPath": {
+            "type": "string",
+            "description": "action=build: output path relative to the project root."
+          },
+          "output_path": {
+            "type": "string",
+            "description": "Alias of 'outputPath'."
+          },
+          "outputDir": {
+            "type": "string",
+            "description": "action=batch: replaces the default 'Builds' root."
+          },
+          "output_dir": {
+            "type": "string",
+            "description": "Alias of 'outputDir'."
+          },
+          "scenes": {
+            "type": "array",
+            "items": {},
+            "description": "Scene asset paths, or objects with path/enabled."
+          },
+          "development": {
+            "type": "boolean",
+            "default": false
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "clean_build, auto_run, deep_profiling, ..."
+          },
+          "subtarget": {
+            "type": "string",
+            "description": "player (default) or server."
+          },
+          "scriptingBackend": {
+            "type": "string",
+            "description": "action=build: mono or il2cpp."
+          },
+          "scripting_backend": {
+            "type": "string",
+            "description": "Alias of 'scriptingBackend'."
+          },
+          "profile": {
+            "type": "string",
+            "description": "action=build/profiles: named profile or a BuildProfile asset path."
+          },
+          "property": {
+            "type": "string",
+            "description": "action=settings: product_name|company_name|version|bundle_id|scripting_backend|defines|architecture."
+          },
+          "value": {
+            "type": "string",
+            "description": "action=settings: omit to read, provide to write."
+          },
+          "activate": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=profiles: activate the named profile."
+          },
+          "save": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=profiles: create or update the named profile."
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=batch: profile names to build, mutually exclusive with 'targets'."
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=batch: build targets, mutually exclusive with 'profiles'."
+          },
+          "append": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=scenes: append instead of replacing the list."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=scenes: required to clear the scene list."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "camera",
+      "summary": "Inspect, create and drive Cameras; Cinemachine brains, bodies, aims, noise, extensions and blends; screenshots.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "scene.camera.write",
+        "scene.camera.read"
+      ],
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Report whether Cinemachine is installed and how many cameras the scene has."
+        },
+        {
+          "name": "create_camera",
+          "summary": "Create a Camera; with Cinemachine installed the Cinemachine path is used."
+        },
+        {
+          "name": "set_target",
+          "summary": "Set the follow and look-at target of a Camera or Cinemachine camera."
+        },
+        {
+          "name": "set_lens",
+          "summary": "Set field of view, clip planes, orthographic size and Dutch."
+        },
+        {
+          "name": "set_priority",
+          "summary": "Set Cinemachine priority, or Camera.depth on a basic camera."
+        },
+        {
+          "name": "list_cameras",
+          "summary": "List the brain, the Cinemachine cameras and the Unity cameras."
+        },
+        {
+          "name": "screenshot",
+          "summary": "Render one camera view to a PNG under Assets/Docs~."
+        },
+        {
+          "name": "screenshot_multiview",
+          "summary": "Render the six surround views around a target as PNGs."
+        },
+        {
+          "name": "ensure_brain",
+          "summary": "Create a CinemachineBrain on a camera when it has none."
+        },
+        {
+          "name": "get_brain_status",
+          "summary": "Report the active Cinemachine camera and blend state."
+        },
+        {
+          "name": "set_body",
+          "summary": "Replace or configure the Cinemachine Body stage component."
+        },
+        {
+          "name": "set_aim",
+          "summary": "Replace or configure the Cinemachine Aim stage component."
+        },
+        {
+          "name": "set_noise",
+          "summary": "Add or configure the Cinemachine noise component."
+        },
+        {
+          "name": "add_extension",
+          "summary": "Attach a CinemachineExtension by type name."
+        },
+        {
+          "name": "remove_extension",
+          "summary": "Remove every CinemachineExtension of a type."
+        },
+        {
+          "name": "set_blend",
+          "summary": "Set the Cinemachine default blend style and duration."
+        },
+        {
+          "name": "force_camera",
+          "summary": "Force a Cinemachine camera live through an override or by priority."
+        },
+        {
+          "name": "release_override",
+          "summary": "Release the active Cinemachine camera override."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "create_camera",
+              "set_target",
+              "set_lens",
+              "set_priority",
+              "list_cameras",
+              "screenshot",
+              "screenshot_multiview",
+              "ensure_brain",
+              "get_brain_status",
+              "set_body",
+              "set_aim",
+              "set_noise",
+              "add_extension",
+              "remove_extension",
+              "set_blend",
+              "force_camera",
+              "release_override"
+            ],
+            "default": "ping"
+          },
+          "target": {
+            "type": "string",
+            "description": "Camera or Cinemachine camera: name, hierarchy path or instance id; 'main' selects Camera.main."
+          },
+          "tag": {
+            "type": "string",
+            "description": "Select the camera by GameObject tag, e.g. MainCamera."
+          },
+          "searchMethod": {
+            "type": "string",
+            "enum": [
+              "by_id_or_name_or_path",
+              "by_id",
+              "by_name",
+              "by_path",
+              "by_tag"
+            ]
+          },
+          "properties": {
+            "type": "object",
+            "description": "Operation payload; nested keys are read exactly as documented."
+          },
+          "name": {
+            "type": "string",
+            "description": "action=create_camera: new GameObject name."
+          },
+          "preset": {
+            "type": "string",
+            "enum": [
+              "follow",
+              "third_person",
+              "freelook",
+              "dolly",
+              "static",
+              "top_down",
+              "side_scroller"
+            ],
+            "description": "action=create_camera with Cinemachine."
+          },
+          "fieldOfView": {
+            "type": "number",
+            "description": "action=create_camera / set_lens."
+          },
+          "nearClipPlane": {
+            "type": "number",
+            "description": "action=create_camera / set_lens."
+          },
+          "farClipPlane": {
+            "type": "number",
+            "description": "action=create_camera / set_lens."
+          },
+          "orthographicSize": {
+            "type": "number",
+            "description": "action=set_lens."
+          },
+          "priority": {
+            "type": "number",
+            "description": "action=create_camera / set_priority."
+          },
+          "viewTarget": {
+            "type": "string",
+            "description": "action=create_camera / screenshot: look-at or orbit centre object."
+          },
+          "camera": {
+            "type": "string",
+            "description": "action=screenshot: camera name, path or instance id. Forbidden with captureSource=scene_view."
+          },
+          "captureSource": {
+            "type": "string",
+            "enum": [
+              "game_view",
+              "scene_view"
+            ],
+            "default": "game_view"
+          },
+          "width": {
+            "type": "integer",
+            "default": 1920,
+            "description": "action=screenshot: output width."
+          },
+          "height": {
+            "type": "integer",
+            "default": 1080,
+            "description": "action=screenshot: output height."
+          },
+          "superSize": {
+            "type": "integer",
+            "default": 1,
+            "description": "action=screenshot: supersampling multiplier."
+          },
+          "includeImage": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=screenshot: inline base64 PNG."
+          },
+          "maxResolution": {
+            "type": "integer",
+            "default": 640,
+            "description": "action=screenshot: longest side of the inlined image."
+          },
+          "filename": {
+            "type": "string",
+            "description": "action=screenshot: output file name; '.png' is appended when missing."
+          },
+          "outputFolder": {
+            "type": "string",
+            "description": "action=screenshot: output folder; defaults to Assets/Docs~/."
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "action=screenshot_multiview: unused, kept for parity with the surface."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=screenshot: overwrite an existing file."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 32
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 2
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 100
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "description": "action=screenshot: wait cap for the capture."
+          }
+        }
+      }
+    },
+    {
+      "name": "console",
+      "summary": "Read the captured Editor console (filter by level, regex and time) or clear it.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.console.read"
+      ],
+      "actions": [
+        {
+          "name": "get",
+          "summary": "Read console entries. Paged, newest-last, with a bounded default page size."
+        },
+        {
+          "name": "clear",
+          "summary": "Append a clear marker so every earlier entry is treated as cleared."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "get",
+              "clear"
+            ],
+            "default": "get"
+          },
+          "level": {
+            "type": "string",
+            "description": "log|warning|error|assert|exception (also repeatable/comma separated)."
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Alias of 'level' (MCP naming); 'all' expands to log/warning/error/assert/exception."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Upper bound for one response; used as the page size unless pageSize is given."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Opaque paging cursor from the previous response, or a plain offset."
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "page_number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "grep": {
+            "type": "string",
+            "description": "Regular expression matched against message and stack trace."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO-8601 time; entries older than this are dropped."
+          },
+          "includeStackTraces": {
+            "type": "boolean",
+            "default": false
+          },
+          "include_stacktraces": {
+            "type": "boolean",
+            "default": false
+          },
+          "include_stack_traces": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "editor",
+      "summary": "Inspect and control the Editor: state, Play Mode, menu items, undo/redo, tool, tags, layers, selection.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.state.read",
+        "editor.state.write",
+        "project.settings.write",
+        "editor.selection.write"
+      ],
+      "actions": [
+        {
+          "name": "state",
+          "summary": "Report project identity, compile/import/Play Mode flags, open scenes and worker session."
+        },
+        {
+          "name": "ping",
+          "summary": "Round-trip liveness probe; the cheapest way to prove the queue is wired up."
+        },
+        {
+          "name": "play",
+          "summary": "Enter Play Mode."
+        },
+        {
+          "name": "stop",
+          "summary": "Leave Play Mode."
+        },
+        {
+          "name": "pause",
+          "summary": "Toggle pause. Only valid in Play Mode."
+        },
+        {
+          "name": "step",
+          "summary": "Advance one frame. Only valid while paused in Play Mode."
+        },
+        {
+          "name": "menu",
+          "summary": "Execute a menu item by its exact path, e.g. 'GameObject/Create Empty'."
+        },
+        {
+          "name": "undo",
+          "summary": "Perform one Undo."
+        },
+        {
+          "name": "redo",
+          "summary": "Perform one Redo."
+        },
+        {
+          "name": "tool",
+          "summary": "Set the active Scene view tool."
+        },
+        {
+          "name": "tool-list",
+          "summary": "List the available Scene view tools."
+        },
+        {
+          "name": "tag-list",
+          "summary": "List every project tag."
+        },
+        {
+          "name": "tag-add",
+          "summary": "Create a project tag."
+        },
+        {
+          "name": "tag-remove",
+          "summary": "Delete a project tag."
+        },
+        {
+          "name": "layer-list",
+          "summary": "List all 32 layers, marking the built-in ones."
+        },
+        {
+          "name": "layer-add",
+          "summary": "Create a user layer in the first free slot (8-31)."
+        },
+        {
+          "name": "layer-remove",
+          "summary": "Clear a user layer. Built-in layers cannot be removed."
+        },
+        {
+          "name": "selection-get",
+          "summary": "Report the current selection."
+        },
+        {
+          "name": "selection-set",
+          "summary": "Replace the selection with resolved objects."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "state",
+              "ping",
+              "play",
+              "stop",
+              "pause",
+              "step",
+              "menu",
+              "undo",
+              "redo",
+              "tool",
+              "tool-list",
+              "tag-list",
+              "tag-add",
+              "tag-remove",
+              "layer-list",
+              "layer-add",
+              "layer-remove",
+              "selection-get",
+              "selection-set"
+            ]
+          },
+          "menuPath": {
+            "type": "string",
+            "description": "action=menu: exact menu path, '/' separated."
+          },
+          "tool": {
+            "type": "string",
+            "description": "action=tool: View, Move, Rotate, Rect, Scale, Custom, None."
+          },
+          "tag": {
+            "type": "string",
+            "description": "action=tag-add / tag-remove."
+          },
+          "layer": {
+            "type": "string",
+            "description": "action=layer-add / layer-remove: layer name."
+          },
+          "target": {
+            "type": "string",
+            "description": "action=selection-set: name, hierarchy path or instance id."
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=selection-set: hierarchy paths."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "graphics",
+      "summary": "Render pipeline settings, skybox/ambient/fog/reflection environment, light baking, renderer features and rendering statistics.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "project.settings.write",
+        "project.lightmaps.write",
+        "scene.render.write"
+      ],
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Report the active pipeline, Volume and URP feature availability, and the effect count."
+        },
+        {
+          "name": "volume_create",
+          "summary": "Create a Volume GameObject, optionally with a VolumeProfile asset and initial effects."
+        },
+        {
+          "name": "volume_add_effect",
+          "summary": "Add a VolumeComponent to the volume profile."
+        },
+        {
+          "name": "volume_set_effect",
+          "summary": "Write parameters onto one VolumeComponent and mark them overridden."
+        },
+        {
+          "name": "volume_remove_effect",
+          "summary": "Remove a VolumeComponent from the volume profile."
+        },
+        {
+          "name": "volume_get_info",
+          "summary": "Read the volume state and its effects."
+        },
+        {
+          "name": "volume_set_properties",
+          "summary": "Set weight, priority, isGlobal and blendDistance on a Volume."
+        },
+        {
+          "name": "volume_list_effects",
+          "summary": "List every VolumeComponent type available in the active pipeline."
+        },
+        {
+          "name": "volume_create_profile",
+          "summary": "Create a VolumeProfile .asset at a path."
+        },
+        {
+          "name": "bake_start",
+          "summary": "Start a lightmap bake and wait for it to finish."
+        },
+        {
+          "name": "bake_cancel",
+          "summary": "Cancel a running lightmap bake."
+        },
+        {
+          "name": "bake_status",
+          "summary": "Report whether a bake is running plus the GI and lightmap counts."
+        },
+        {
+          "name": "bake_clear",
+          "summary": "Discard the baked lightmap data."
+        },
+        {
+          "name": "bake_reflection_probe",
+          "summary": "Bake one reflection probe to Assets/Lightmaps and wait for it to finish."
+        },
+        {
+          "name": "bake_get_settings",
+          "summary": "Read the lightmap settings of the active LightingSettings asset."
+        },
+        {
+          "name": "bake_set_settings",
+          "summary": "Write lightmap settings onto the active LightingSettings asset."
+        },
+        {
+          "name": "bake_create_light_probe_group",
+          "summary": "Create a LightProbeGroup with a probe grid."
+        },
+        {
+          "name": "bake_create_reflection_probe",
+          "summary": "Create a ReflectionProbe with mode, resolution and bounds."
+        },
+        {
+          "name": "bake_set_probe_positions",
+          "summary": "Replace the probe positions of a LightProbeGroup."
+        },
+        {
+          "name": "stats_get",
+          "summary": "Read the rendering statistics of the last frame."
+        },
+        {
+          "name": "stats_list_counters",
+          "summary": "List the Profiler counters of one category."
+        },
+        {
+          "name": "stats_set_scene_debug",
+          "summary": "Set the Scene view draw mode."
+        },
+        {
+          "name": "stats_get_memory",
+          "summary": "Read texture, mesh and managed memory totals."
+        },
+        {
+          "name": "pipeline_get_info",
+          "summary": "Report the active pipeline, quality level, colour space and pipeline settings."
+        },
+        {
+          "name": "pipeline_set_quality",
+          "summary": "Set the active quality level by name or index."
+        },
+        {
+          "name": "pipeline_get_settings",
+          "summary": "Read the public and serialized properties of the pipeline asset."
+        },
+        {
+          "name": "pipeline_set_settings",
+          "summary": "Write properties onto the pipeline asset by property or m_Xxx path."
+        },
+        {
+          "name": "feature_list",
+          "summary": "List the renderer features of one URP renderer."
+        },
+        {
+          "name": "feature_add",
+          "summary": "Add a ScriptableRendererFeature to a URP renderer."
+        },
+        {
+          "name": "feature_remove",
+          "summary": "Remove a renderer feature by index or name."
+        },
+        {
+          "name": "feature_configure",
+          "summary": "Write serialized properties onto a renderer feature."
+        },
+        {
+          "name": "feature_toggle",
+          "summary": "Enable or disable a renderer feature."
+        },
+        {
+          "name": "feature_reorder",
+          "summary": "Reorder the renderer features of one renderer."
+        },
+        {
+          "name": "skybox_get",
+          "summary": "Read the skybox material, ambient, fog, reflection and sun settings."
+        },
+        {
+          "name": "skybox_set_material",
+          "summary": "Assign the skybox material."
+        },
+        {
+          "name": "skybox_set_properties",
+          "summary": "Write properties onto the skybox material."
+        },
+        {
+          "name": "skybox_set_ambient",
+          "summary": "Set the ambient mode, colours and intensity."
+        },
+        {
+          "name": "skybox_set_fog",
+          "summary": "Set the fog mode, colour, density and distances."
+        },
+        {
+          "name": "skybox_set_reflection",
+          "summary": "Set the reflection intensity, bounces, mode and cubemap."
+        },
+        {
+          "name": "skybox_set_sun",
+          "summary": "Assign the sun used by the skybox."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "volume_create",
+              "volume_add_effect",
+              "volume_set_effect",
+              "volume_remove_effect",
+              "volume_get_info",
+              "volume_set_properties",
+              "volume_list_effects",
+              "volume_create_profile",
+              "bake_start",
+              "bake_cancel",
+              "bake_status",
+              "bake_clear",
+              "bake_reflection_probe",
+              "bake_get_settings",
+              "bake_set_settings",
+              "bake_create_light_probe_group",
+              "bake_create_reflection_probe",
+              "bake_set_probe_positions",
+              "stats_get",
+              "stats_list_counters",
+              "stats_set_scene_debug",
+              "stats_get_memory",
+              "pipeline_get_info",
+              "pipeline_set_quality",
+              "pipeline_get_settings",
+              "pipeline_set_settings",
+              "feature_list",
+              "feature_add",
+              "feature_remove",
+              "feature_configure",
+              "feature_toggle",
+              "feature_reorder",
+              "skybox_get",
+              "skybox_set_material",
+              "skybox_set_properties",
+              "skybox_set_ambient",
+              "skybox_set_fog",
+              "skybox_set_reflection",
+              "skybox_set_sun"
+            ],
+            "default": "ping"
+          },
+          "name": {
+            "type": "string",
+            "description": "New object or feature name; also a target fallback for bake_probe and skybox_set_sun."
+          },
+          "target": {
+            "type": "string",
+            "description": "Volume or GameObject name / instance id."
+          },
+          "isGlobal": {
+            "type": "boolean",
+            "default": true,
+            "description": "action=volume_create / volume_set_properties."
+          },
+          "weight": {
+            "type": "number",
+            "default": 1.0,
+            "description": "action=volume_create / volume_set_properties."
+          },
+          "priority": {
+            "type": "number",
+            "default": 0.0,
+            "description": "action=volume_create / volume_set_properties."
+          },
+          "blendDistance": {
+            "type": "number",
+            "description": "action=volume_set_properties."
+          },
+          "profilePath": {
+            "type": "string",
+            "description": "action=volume_create: VolumeProfile asset path; '(embedded)' when omitted."
+          },
+          "path": {
+            "type": "string",
+            "description": "action=volume_create_profile / skybox_set_material / skybox_set_reflection."
+          },
+          "materialPath": {
+            "type": "string",
+            "description": "action=skybox_set_material fallback key."
+          },
+          "cubemapPath": {
+            "type": "string",
+            "description": "action=skybox_set_reflection fallback key."
+          },
+          "effect": {
+            "type": "string",
+            "description": "action=volume_add_effect / volume_set_effect / volume_remove_effect: VolumeComponent type name."
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "action=volume_create: [{ type, parameters }] applied after creation."
+          },
+          "parameters": {
+            "type": "object",
+            "description": "action=volume_set_effect / skybox_set_properties: field name to value."
+          },
+          "properties": {
+            "type": "object",
+            "description": "action=volume_set_properties / feature_add / feature_configure / skybox_set_properties."
+          },
+          "settings": {
+            "type": "object",
+            "description": "action=bake_set_settings / pipeline_set_settings / feature_configure."
+          },
+          "async": {
+            "type": "boolean",
+            "default": true,
+            "description": "action=bake_start: Lightmapping.BakeAsync versus Bake."
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "action=bake_start / bake_reflection_probe wait cap."
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "action=bake_create_*: [x,y,z]."
+          },
+          "gridSize": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "action=bake_create_light_probe_group: [x,y,z] grid, default [3,2,3]."
+          },
+          "spacing": {
+            "type": "number",
+            "default": 2.0,
+            "description": "action=bake_create_light_probe_group."
+          },
+          "size": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "action=bake_create_reflection_probe: bounds size, default [10,10,10]."
+          },
+          "resolution": {
+            "type": "integer",
+            "default": 256,
+            "description": "action=bake_create_reflection_probe / skybox_set_reflection."
+          },
+          "mode": {
+            "type": "string",
+            "description": "action=bake_create_reflection_probe / stats_set_scene_debug / skybox_set_*."
+          },
+          "hdr": {
+            "type": "boolean",
+            "default": true,
+            "description": "action=bake_create_reflection_probe."
+          },
+          "boxProjection": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=bake_create_reflection_probe."
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "description": "action=bake_set_probe_positions: [[x,y,z], ...]."
+          },
+          "category": {
+            "type": "string",
+            "default": "Render",
+            "description": "action=stats_list_counters: Profiler category name."
+          },
+          "level": {
+            "type": "string",
+            "description": "action=pipeline_set_quality: quality level name or index."
+          },
+          "rendererIndex": {
+            "type": "integer",
+            "description": "action=feature_*: index into the URP renderer data list."
+          },
+          "type": {
+            "type": "string",
+            "description": "action=feature_add: ScriptableRendererFeature type name."
+          },
+          "material": {
+            "type": "string",
+            "description": "action=feature_add / skybox_set_material: material asset path."
+          },
+          "index": {
+            "type": "integer",
+            "description": "action=feature_remove / feature_configure / feature_toggle."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "action=feature_toggle."
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "action=feature_reorder: a permutation of 0..N-1."
+          },
+          "color": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "action=skybox_set_ambient / skybox_set_fog."
+          },
+          "skyColor": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "equatorColor": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "groundColor": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ambientMode": {
+            "type": "string",
+            "description": "action=skybox_set_ambient: Skybox / Trilight / Flat / Custom."
+          },
+          "intensity": {
+            "type": "number",
+            "description": "action=skybox_set_ambient / skybox_set_reflection."
+          },
+          "fogEnabled": {
+            "type": "boolean",
+            "description": "action=skybox_set_fog."
+          },
+          "fogMode": {
+            "type": "string",
+            "description": "action=skybox_set_fog: Linear / Exponential / ExponentialSquared."
+          },
+          "fogColor": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "fogDensity": {
+            "type": "number",
+            "description": "action=skybox_set_fog."
+          },
+          "fogStart": {
+            "type": "number",
+            "description": "action=skybox_set_fog."
+          },
+          "fogEnd": {
+            "type": "number",
+            "description": "action=skybox_set_fog."
+          },
+          "bounces": {
+            "type": "integer",
+            "description": "action=skybox_set_reflection."
+          },
+          "reflectionMode": {
+            "type": "string",
+            "description": "action=skybox_set_reflection: Skybox / Custom."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "action=skybox_set_fog fallback key."
+          },
+          "start": {
+            "type": "number",
+            "description": "action=skybox_set_fog fallback key."
+          },
+          "end": {
+            "type": "number",
+            "description": "action=skybox_set_fog fallback key."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 100
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "material",
+      "summary": "Create materials, write shader properties and colours, assign materials to renderers, inspect a material's shader surface.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Liveness probe for this command group."
+        },
+        {
+          "name": "create",
+          "summary": "Create a material asset with a shader and optional initial properties."
+        },
+        {
+          "name": "set_material_shader_property",
+          "summary": "Write one shader property (float/int/color/vector/texture)."
+        },
+        {
+          "name": "set_material_color",
+          "summary": "Write a colour on a material."
+        },
+        {
+          "name": "assign_material_to_renderer",
+          "summary": "Assign a material asset to a renderer slot."
+        },
+        {
+          "name": "set_renderer_color",
+          "summary": "Set a colour on a material, in place or as a new instance/asset."
+        },
+        {
+          "name": "get_material_info",
+          "summary": "Report shader name, property names, keywords and optionally values."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "create",
+              "set_material_shader_property",
+              "set_material_color",
+              "assign_material_to_renderer",
+              "set_renderer_color",
+              "get_material_info"
+            ],
+            "default": "ping"
+          },
+          "materialPath": {
+            "type": "string",
+            "aliases": [
+              "material_path"
+            ],
+            "description": "Assets 相对材质路径，自动补 Assets/ 前缀与 .mat 后缀。"
+          },
+          "property": {
+            "type": "string",
+            "description": "着色器属性名。"
+          },
+          "value": {
+            "description": "属性值：number / bool / array / object / string。"
+          },
+          "color": {
+            "description": "颜色：[r,g,b(,a)] / 对象 {r,g,b,a} / #RRGGBB(AA)。"
+          },
+          "shader": {
+            "type": "string",
+            "description": "action=create: 着色器名，默认按当前渲染管线解析。"
+          },
+          "properties": {
+            "type": "object",
+            "description": "action=create: 批量属性表。"
+          },
+          "target": {
+            "type": "string",
+            "description": "action=assign_material_to_renderer/set_renderer_color: 场景 GameObject 名称或层级路径。"
+          },
+          "searchMethod": {
+            "type": "string",
+            "aliases": [
+              "search_method"
+            ],
+            "description": "by_name / by_path / by_id / by_tag / by_layer / by_component。"
+          },
+          "slot": {
+            "type": "integer",
+            "default": 0
+          },
+          "mode": {
+            "type": "string",
+            "default": "property_block",
+            "description": "property_block / shared / instance / create_unique。"
+          },
+          "includeValues": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "include_values"
+            ],
+            "description": "action=get_material_info: 是否返回属性值。"
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "meta",
+      "summary": "Inspect and refresh the command surface itself: export the static registry, scaffold project-local commands, report the worker environment.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "filesystem.write",
+        "editor.state.read"
+      ],
+      "actions": [
+        {
+          "name": "export-registry",
+          "summary": "Regenerate the shipped commands/registry.json from the compiled package commands only."
+        },
+        {
+          "name": "catalog",
+          "summary": "Dump the runtime command catalog exactly as published to Library/CustomUnityCli."
+        },
+        {
+          "name": "schema",
+          "summary": "Return the parameter JSON schema of one command group."
+        },
+        {
+          "name": "doctor",
+          "summary": "Worker-side environment report: command diagnostics, optional packages, versions."
+        },
+        {
+          "name": "extensions",
+          "summary": "Report the project-local extension area and the commands it contributes."
+        },
+        {
+          "name": "new-command",
+          "summary": "Scaffold a new project-local command group in the extension area."
+        },
+        {
+          "name": "verify",
+          "summary": "Self-check: validate the extension area and every command's action list against its JSON schema."
+        },
+        {
+          "name": "environment",
+          "summary": "Report Unity, platform, package versions and the optional-package probe results."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "export-registry",
+              "catalog",
+              "schema",
+              "doctor",
+              "extensions",
+              "new-command",
+              "verify",
+              "environment"
+            ],
+            "default": "doctor"
+          },
+          "path": {
+            "type": "string",
+            "description": "action=export-registry: destination for registry.json. Relative paths resolve against the project root."
+          },
+          "group": {
+            "type": "string",
+            "description": "action=schema / new-command: group name, e.g. object."
+          },
+          "summary": {
+            "type": "string",
+            "description": "action=new-command: one-line description of the group."
+          },
+          "actionNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=new-command: sub-action names to scaffold. Defaults to a single 'run' action."
+          },
+          "namespace": {
+            "type": "string",
+            "description": "action=new-command: C# namespace for the generated file."
+          },
+          "overwrite": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=new-command: overwrite an existing file."
+          }
+        }
+      }
+    },
+    {
+      "name": "object",
+      "summary": "GameObject 与组件：创建、修改、删除、复制、相对移动、朝向、查找，以及组件的增删改查与检视。",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.scene.read",
+        "editor.scene.write",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "create",
+          "summary": "创建 GameObject（空物体 / primitive / prefab 实例），可设父节点、transform、tag、layer、组件。"
+        },
+        {
+          "name": "modify",
+          "summary": "修改目标 GameObject：改名、父节点、transform、tag、layer、激活状态、静态标记、组件增删与属性。"
+        },
+        {
+          "name": "delete",
+          "summary": "删除全部同名匹配的 GameObject（需要 force: true 确认，data 里报告删除数量）。"
+        },
+        {
+          "name": "duplicate",
+          "summary": "复制目标 GameObject，可设置新名、世界位置、世界偏移与父节点。"
+        },
+        {
+          "name": "move_relative",
+          "summary": "相对参考物体沿指定方向移动目标，支持世界轴或参考物体本地轴。"
+        },
+        {
+          "name": "look_at",
+          "summary": "让目标朝向一个坐标或另一个 GameObject。"
+        },
+        {
+          "name": "find",
+          "summary": "按 searchMethod 分页查找 GameObject（by_name / by_tag / by_layer / by_component / by_path / by_id）。"
+        },
+        {
+          "name": "list",
+          "summary": "列出目标 GameObject 上的全部组件（受 maxItems / maxDepth 限制）。"
+        },
+        {
+          "name": "add",
+          "summary": "给目标 GameObject 添加一个组件，可同时写入初始属性。"
+        },
+        {
+          "name": "remove",
+          "summary": "移除目标 GameObject 上的一个组件（可按 componentIndex 指定同类型实例）。"
+        },
+        {
+          "name": "set-property",
+          "summary": "写入组件属性：批量 properties 对象，或 property + value 单字段。"
+        },
+        {
+          "name": "get-property",
+          "summary": "读取单个组件属性，输出受 CucliDescribe 约束。"
+        },
+        {
+          "name": "inspect",
+          "summary": "检视组件（或 GameObject 本身）的成员清单，可选读取成员值。"
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "modify",
+              "delete",
+              "duplicate",
+              "move_relative",
+              "look_at",
+              "find",
+              "list",
+              "add",
+              "remove",
+              "set-property",
+              "get-property",
+              "inspect"
+            ],
+            "default": "create"
+          },
+          "target": {
+            "type": "string",
+            "description": "name / 层级路径 / instanceID；create 之外多数 action 需要。"
+          },
+          "name": {
+            "type": "string",
+            "description": "action=create：新物体名；action=modify：缺 target 时作为查找名。"
+          },
+          "newName": {
+            "type": "string",
+            "description": "action=modify / duplicate：改名后的新名。"
+          },
+          "searchMethod": {
+            "type": "string",
+            "enum": [
+              "by_id_or_name_or_path",
+              "by_id",
+              "by_name",
+              "by_path",
+              "by_tag",
+              "by_layer",
+              "by_component"
+            ],
+            "description": "寻址方式；find 默认 by_name。"
+          },
+          "searchTerm": {
+            "type": "string",
+            "description": "action=find：搜索词（target 为兼容别名）。"
+          },
+          "includeInactive": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=find：是否包含 inactive（resolver 始终包含）。"
+          },
+          "parent": {
+            "description": "action=create / modify / duplicate：父物体引用；空串或 null 表示移到根。"
+          },
+          "position": {
+            "description": "action=create / modify 写 localPosition；duplicate 写世界 position。"
+          },
+          "rotation": {
+            "description": "action=create / modify：localEulerAngles [x,y,z]。"
+          },
+          "scale": {
+            "description": "action=create / modify：localScale [x,y,z]。"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string",
+            "description": "层名或 0-31 的层索引。"
+          },
+          "setActive": {
+            "type": "boolean",
+            "description": "action=modify：设置 activeSelf。"
+          },
+          "isStatic": {
+            "type": "boolean",
+            "description": "action=modify：设置 StaticEditorFlags。"
+          },
+          "primitiveType": {
+            "type": "string",
+            "description": "action=create：PrimitiveType 枚举名（Sphere / Capsule / Cylinder / Cube / Plane / Quad）。"
+          },
+          "prefabPath": {
+            "type": "string",
+            "description": "action=create：实例化来源 prefab；saveAsPrefab 时作为保存目标。"
+          },
+          "saveAsPrefab": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create：把新物体存为 prefab。"
+          },
+          "componentsToAdd": {
+            "type": "array",
+            "items": {},
+            "description": "元素为类型名，或 { typeName, properties }。"
+          },
+          "componentsToRemove": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "componentProperties": {
+            "description": "{ 组件名: { 属性: 值 } }，也接受 JSON 字符串。"
+          },
+          "componentType": {
+            "type": "string",
+            "description": "组件类型名，支持全限定名。"
+          },
+          "componentIndex": {
+            "type": "integer",
+            "description": "同类型多实例时按 0 基索引操作。"
+          },
+          "properties": {
+            "description": "action=add / set-property：{ 属性: 值 } 对象或 JSON 字符串。"
+          },
+          "property": {
+            "type": "string",
+            "description": "action=set-property / get-property：单个属性名或属性路径（如 a.b[0].c）。"
+          },
+          "value": {
+            "description": "action=set-property：与 property 配对的单属性值。"
+          },
+          "offset": {
+            "description": "action=duplicate：世界偏移；action=move_relative：相对偏移。"
+          },
+          "referenceObject": {
+            "description": "action=move_relative：参考物体引用（必填）。"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "right",
+              "left",
+              "up",
+              "down",
+              "forward",
+              "front",
+              "back",
+              "backward",
+              "behind"
+            ],
+            "default": "forward"
+          },
+          "distance": {
+            "type": "number",
+            "default": 1
+          },
+          "worldSpace": {
+            "type": "boolean",
+            "default": true,
+            "description": "action=move_relative：true 用世界轴，false 用参考物体本地轴。"
+          },
+          "lookAtTarget": {
+            "description": "action=look_at：[x,y,z] 或 GameObject 引用。"
+          },
+          "lookAtUp": {
+            "description": "action=look_at：上方向，默认 [0,1,0]。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=delete：确认删除。"
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "0 基游标。"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64,
+            "description": "list / get-property / inspect 的输出上限。"
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          },
+          "maxStringLength": {
+            "type": "integer",
+            "default": 4096
+          },
+          "includeValues": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=inspect：是否读取成员值。"
+          },
+          "includeNoisy": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=inspect：是否包含 hideFlags 之类的噪声成员。"
+          }
+        }
+      }
+    },
+    {
+      "name": "package",
+      "summary": "Unity Package Manager: install, remove, embed, list, search, inspect packages and manage scoped registries.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.packages.read",
+        "project.packages.write",
+        "project.settings.write",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Report the Package Manager liveness facts: Unity version, installed package count, busy flags."
+        },
+        {
+          "name": "status",
+          "summary": "Poll a package job by job_id (defaults to the most recent one)."
+        },
+        {
+          "name": "list_packages",
+          "summary": "List the packages registered in this project. Paged."
+        },
+        {
+          "name": "search_packages",
+          "summary": "Search the registry for a package by name or id. Paged."
+        },
+        {
+          "name": "get_package_info",
+          "summary": "Describe one installed package, including its dependencies."
+        },
+        {
+          "name": "list_registries",
+          "summary": "List the scoped registries declared in Packages/manifest.json."
+        },
+        {
+          "name": "add_package",
+          "summary": "Install a package. Returns a job handle; poll it with action=status."
+        },
+        {
+          "name": "remove_package",
+          "summary": "Uninstall a package. Returns a job handle; poll it with action=status."
+        },
+        {
+          "name": "embed_package",
+          "summary": "Embed a package into Packages/. Returns a job handle; poll it with action=status."
+        },
+        {
+          "name": "add_registry",
+          "summary": "Add a scoped registry to Packages/manifest.json (the file is backed up first)."
+        },
+        {
+          "name": "remove_registry",
+          "summary": "Remove a scoped registry from Packages/manifest.json (the file is backed up first)."
+        },
+        {
+          "name": "resolve_packages",
+          "summary": "Ask the Package Manager to re-resolve the project manifest."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "status",
+              "list_packages",
+              "search_packages",
+              "get_package_info",
+              "list_registries",
+              "add_package",
+              "remove_package",
+              "embed_package",
+              "add_registry",
+              "remove_registry",
+              "resolve_packages"
+            ],
+            "default": "ping"
+          },
+          "package": {
+            "type": "string",
+            "description": "action=add/remove/embed/get_package_info: package id, optionally name@version."
+          },
+          "packageId": {
+            "type": "string",
+            "description": "Alias of 'package'."
+          },
+          "package_id": {
+            "type": "string",
+            "description": "Alias of 'package'."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=remove_package: remove even when other packages depend on it."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "action=status: job handle."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "Alias of 'jobId'."
+          },
+          "query": {
+            "type": "string",
+            "description": "action=search_packages: search string."
+          },
+          "name": {
+            "type": "string",
+            "description": "action=add_registry/remove_registry: registry name."
+          },
+          "url": {
+            "type": "string",
+            "description": "action=add_registry/remove_registry: registry url."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=add_registry: scope strings."
+          },
+          "offline": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=list_packages: use the local cache instead of the network."
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 20
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "page_number": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "prefab",
+      "summary": "Prefab 资产：从场景物体创建、读取信息与层级、在隔离上下文中修改内容，以及 Prefab Stage 的打开/保存/关闭。",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write",
+        "editor.scene.write"
+      ],
+      "actions": [
+        {
+          "name": "create_from_gameobject",
+          "summary": "把场景或 Prefab Stage 中的物体保存为 prefab 资产（需要 force 才能覆盖已存在资产）。"
+        },
+        {
+          "name": "get_info",
+          "summary": "读取 prefab 资产信息：guid、类型、根物体、组件类型、子物体数、是否 Variant。"
+        },
+        {
+          "name": "get_hierarchy",
+          "summary": "分页列出 prefab 内部的全部节点（路径为 A/B/C 形式）。"
+        },
+        {
+          "name": "modify_contents",
+          "summary": "在 LoadPrefabContents 事务中修改 prefab 内容：改名、transform、父节点、组件、增删子物体。"
+        },
+        {
+          "name": "open_prefab_stage",
+          "summary": "在 Prefab Stage（可交互编辑态）中打开 prefab。"
+        },
+        {
+          "name": "save_prefab_stage",
+          "summary": "保存当前 Prefab Stage 的内容。"
+        },
+        {
+          "name": "close_prefab_stage",
+          "summary": "退出 Prefab Stage，可选先保存。"
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create_from_gameobject",
+              "get_info",
+              "get_hierarchy",
+              "modify_contents",
+              "open_prefab_stage",
+              "save_prefab_stage",
+              "close_prefab_stage"
+            ],
+            "default": "create_from_gameobject"
+          },
+          "prefabPath": {
+            "type": "string",
+            "description": "prefab 资产路径，必须位于 Assets/ 下；path 为别名。"
+          },
+          "target": {
+            "type": "string",
+            "description": "create 时是场景/Prefab Stage 内的源物体；modify 时是 prefab 内部 A/B/C 路径或名称。"
+          },
+          "name": {
+            "type": "string",
+            "description": "create 时是 target 的别名；modify 时是重命名的新名。"
+          },
+          "searchInactive": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create_from_gameobject：源物体查找是否包含 inactive。"
+          },
+          "allowOverwrite": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create_from_gameobject：force 的 MCP 别名。"
+          },
+          "unlinkIfInstance": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create_from_gameobject：先 UnpackPrefabInstance(Completely)。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create_from_gameobject：覆盖已存在的 prefab 资产。"
+          },
+          "setActive": {
+            "type": "boolean",
+            "description": "action=modify_contents：设置 activeSelf。"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string",
+            "description": "层名。"
+          },
+          "position": {
+            "description": "action=modify_contents / createChild：localPosition [x,y,z]。"
+          },
+          "rotation": {
+            "description": "action=modify_contents / createChild：localEulerAngles [x,y,z]。"
+          },
+          "scale": {
+            "description": "action=modify_contents / createChild：localScale [x,y,z]。"
+          },
+          "parent": {
+            "type": "string",
+            "description": "action=modify_contents：prefab 内新父物体名/路径；空串表示置根。"
+          },
+          "componentsToAdd": {
+            "type": "array",
+            "items": {},
+            "description": "元素为类型名或 { typeName, properties }。"
+          },
+          "componentsToRemove": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "componentProperties": {
+            "description": "{ 组件名: { 属性: 值 } }；任一失败则整体不保存。"
+          },
+          "createChild": {
+            "description": "子物体定义对象或对象数组（name / parent / sourcePrefabPath / primitiveType / transform / componentsToAdd / tag / layer / setActive）。"
+          },
+          "deleteChild": {
+            "description": "相对 target 的子物体路径：字符串、字符串数组或 { name }。"
+          },
+          "saveBeforeClose": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=close_prefab_stage：关闭前先保存。"
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 100
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "0 基游标。"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "refresh",
+      "summary": "Refresh assets, trigger or await script compilation, reimport specific paths, and wait for the Editor to become idle.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": true,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "project.recompile",
+        "editor.state.write"
+      ],
+      "actions": [
+        {
+          "name": "assets",
+          "summary": "Rescan the asset database (AssetDatabase.Refresh)."
+        },
+        {
+          "name": "compile",
+          "summary": "Request script compilation and, by default, wait until it finishes."
+        },
+        {
+          "name": "reimport",
+          "summary": "Force-reimport specific asset paths."
+        },
+        {
+          "name": "wait",
+          "summary": "Block until the Editor is idle: not compiling and not importing."
+        },
+        {
+          "name": "status",
+          "summary": "Report compile/import state and the first compilation error, if any."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "assets",
+              "compile",
+              "reimport",
+              "wait",
+              "status"
+            ],
+            "default": "assets"
+          },
+          "path": {
+            "type": "string",
+            "description": "action=reimport: one asset path."
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=reimport: several asset paths."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=reimport: force update."
+          },
+          "wait": {
+            "type": "boolean",
+            "default": true,
+            "description": "action=compile: wait for compilation to finish."
+          },
+          "requireCompileSuccess": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=wait: fail if the last compilation had errors."
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1800,
+            "default": 300
+          }
+        }
+      }
+    },
+    {
+      "name": "scene",
+      "summary": "场景管理：创建、加载、保存、关闭、切换激活、层级浏览、Build Settings、截图、框选与校验。",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write",
+        "editor.scene.read",
+        "editor.scene.write"
+      ],
+      "actions": [
+        {
+          "name": "create",
+          "summary": "新建场景（empty / default / 3d_basic / 2d_basic 模板，默认 Assets/Scenes/<name>.unity）。"
+        },
+        {
+          "name": "load",
+          "summary": "按 path / name / buildIndex 加载场景；当前场景有未保存改动时按 MCP 语义拒绝加载。"
+        },
+        {
+          "name": "save",
+          "summary": "保存指定或当前场景，可另存到新的 path。"
+        },
+        {
+          "name": "get_hierarchy",
+          "summary": "分页列出场景根节点或某个父物体的直接子级（含 inactive、组件类型、可选 transform）。"
+        },
+        {
+          "name": "get_active",
+          "summary": "报告当前活动场景的名称、路径、buildIndex、脏标记与根节点数量。"
+        },
+        {
+          "name": "get_build_settings",
+          "summary": "列出 EditorBuildSettings 中的场景（path / guid / enabled / buildIndex）。"
+        },
+        {
+          "name": "screenshot",
+          "summary": "截图（game_view 或 scene_view、相机/定位/包围盒批量环绕），写出 PNG 资产，可选内联 base64。"
+        },
+        {
+          "name": "scene_view_frame",
+          "summary": "在 SceneView 中框选目标物体或整个场景。"
+        },
+        {
+          "name": "close_scene",
+          "summary": "关闭已加载场景；只剩一个场景或场景有未保存改动时拒绝。"
+        },
+        {
+          "name": "set_active_scene",
+          "summary": "把某个已加载场景设为活动场景。"
+        },
+        {
+          "name": "get_loaded_scenes",
+          "summary": "列出全部已加载场景及其状态。"
+        },
+        {
+          "name": "move_to_scene",
+          "summary": "把一个根 GameObject 移动到另一个已加载场景。"
+        },
+        {
+          "name": "validate",
+          "summary": "校验活动场景中的 Missing Script 与丢失引用的 prefab，可选自动修复 Missing Script。"
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "load",
+              "save",
+              "get_hierarchy",
+              "get_active",
+              "get_build_settings",
+              "screenshot",
+              "scene_view_frame",
+              "close_scene",
+              "set_active_scene",
+              "get_loaded_scenes",
+              "move_to_scene",
+              "validate"
+            ],
+            "default": "create"
+          },
+          "name": {
+            "type": "string",
+            "description": "action=create / save / load / close_scene / set_active_scene / move_to_scene：场景名。"
+          },
+          "path": {
+            "type": "string",
+            "description": "action=create / load / save：目录或 .unity 资产路径（Assets/ 下）。"
+          },
+          "buildIndex": {
+            "type": "integer",
+            "description": "action=load：Build Settings 索引，与 path/name 二选一。"
+          },
+          "additive": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=load：以 Additive 方式打开。"
+          },
+          "template": {
+            "type": "string",
+            "enum": [
+              "empty",
+              "default",
+              "3d_basic",
+              "2d_basic"
+            ],
+            "description": "action=create：场景模板。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create：覆盖同名场景并丢弃未保存改动。"
+          },
+          "captureSource": {
+            "type": "string",
+            "enum": [
+              "game_view",
+              "scene_view"
+            ],
+            "default": "game_view"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "action=screenshot：输出文件名（自动补 .png）。"
+          },
+          "superSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8,
+            "default": 1
+          },
+          "includeImage": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=screenshot：是否内联 base64 图片。"
+          },
+          "maxResolution": {
+            "type": "integer",
+            "default": 640,
+            "description": "action=screenshot：内联图片长边上限，0 表示默认 640。"
+          },
+          "outputFolder": {
+            "type": "string",
+            "description": "action=screenshot：输出目录，默认 Assets/Screenshots。"
+          },
+          "camera": {
+            "type": "string",
+            "description": "action=screenshot：Camera 的 name / hierarchy path / instanceID（scene_view 下禁止）。"
+          },
+          "batch": {
+            "type": "string",
+            "enum": [
+              "surround",
+              "orbit"
+            ],
+            "description": "action=screenshot：包围盒批量环绕截图。"
+          },
+          "viewTarget": {
+            "description": "action=screenshot：聚焦目标（GO 引用或 [x,y,z]）。"
+          },
+          "viewPosition": {
+            "description": "action=screenshot：临时相机位置 [x,y,z]。"
+          },
+          "viewRotation": {
+            "description": "action=screenshot：临时相机欧拉角 [x,y,z]。"
+          },
+          "orbitAngles": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36,
+            "default": 8
+          },
+          "orbitElevations": {
+            "description": "action=screenshot(batch=orbit)：仰角列表，默认 [0,30,-15]。"
+          },
+          "orbitDistance": {
+            "type": "number",
+            "description": "action=screenshot(batch=orbit)：相机距中心距离。"
+          },
+          "orbitFov": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 120,
+            "default": 60
+          },
+          "sceneViewTarget": {
+            "description": "action=scene_view_frame：要框选的物体（GO 引用）。"
+          },
+          "parent": {
+            "type": "string",
+            "description": "action=get_hierarchy：列出该物体的直接子级；省略则列出场景根节点。"
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "action=get_hierarchy / get_build_settings / get_loaded_scenes：0 基游标。"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxNodes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000,
+            "default": 1000
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4,
+            "description": "action=get_hierarchy：当前分页模式只返回一层，仅为兼容回显。"
+          },
+          "maxChildrenPerNode": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000,
+            "default": 200
+          },
+          "includeTransform": {
+            "type": "boolean",
+            "default": false
+          },
+          "sceneName": {
+            "type": "string",
+            "description": "action=close_scene / set_active_scene / move_to_scene：已加载场景名。"
+          },
+          "scenePath": {
+            "type": "string",
+            "description": "action=close_scene / set_active_scene / move_to_scene：已加载场景路径。"
+          },
+          "removeScene": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=close_scene：true 从内存移除，false 仅卸载。"
+          },
+          "target": {
+            "type": "string",
+            "description": "action=move_to_scene：根 GameObject 的 name / path / instanceID。"
+          },
+          "autoRepair": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=validate：自动移除 Missing Script。"
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          }
+        }
+      }
+    },
+    {
+      "name": "script",
+      "summary": "Create, read, edit, validate, hash and delete C# scripts under Assets/.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": true,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "create",
+          "summary": "Create a .cs file from a template or explicit contents."
+        },
+        {
+          "name": "read",
+          "summary": "Read a slice of a script: line range and maximum characters."
+        },
+        {
+          "name": "update",
+          "summary": "Deprecated alias of apply_text_edits (whole-file overwrite with the given contents)."
+        },
+        {
+          "name": "edit",
+          "summary": "Structured edits: replace/delete class or method, anchor insert/delete/replace."
+        },
+        {
+          "name": "apply_text_edits",
+          "summary": "Replace exact line/column ranges, guarded by a precondition SHA-256."
+        },
+        {
+          "name": "validate",
+          "summary": "Structural validation: bracket balance, using/namespace consistency, duplicate members."
+        },
+        {
+          "name": "get_sha",
+          "summary": "Report the SHA-256 of the file contents."
+        },
+        {
+          "name": "delete",
+          "summary": "Move a script to the OS trash. Requires force=true."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "read",
+              "update",
+              "edit",
+              "apply_text_edits",
+              "validate",
+              "get_sha",
+              "delete"
+            ],
+            "default": "create"
+          },
+          "name": {
+            "type": "string",
+            "description": "类名或文件名，拼成 {name}.cs；须匹配 ^[a-zA-Z_][a-zA-Z0-9_]*$。"
+          },
+          "path": {
+            "type": "string",
+            "description": "相对 Assets/ 的目录；空时默认 Scripts。"
+          },
+          "contents": {
+            "type": "string",
+            "description": "action=create/update: 脚本正文。"
+          },
+          "contentsEncoded": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "contents_encoded"
+            ]
+          },
+          "encodedContents": {
+            "type": "string",
+            "aliases": [
+              "encoded_contents"
+            ],
+            "description": "contentsEncoded=true 时的 base64 正文。"
+          },
+          "scriptType": {
+            "type": "string",
+            "aliases": [
+              "script_type"
+            ],
+            "description": "action=create: MonoBehaviour / ScriptableObject / Editor / EditorWindow / Plain。"
+          },
+          "namespace": {
+            "type": "string",
+            "description": "action=create: 生成模板的外层 namespace。"
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "precondition_sha256": {
+            "type": "string",
+            "aliases": [
+              "preconditionSha256"
+            ],
+            "description": "action=apply_text_edits: 前置文件 SHA-256。"
+          },
+          "options": {
+            "type": "object",
+            "description": "{refresh, validate, applyMode}。"
+          },
+          "level": {
+            "type": "string",
+            "description": "action=validate: basic / standard / comprehensive / strict。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=delete: 必须显式确认。"
+          },
+          "startLine": {
+            "type": "integer",
+            "aliases": [
+              "start_line"
+            ],
+            "description": "action=read: 1 基起始行。"
+          },
+          "endLine": {
+            "type": "integer",
+            "aliases": [
+              "end_line"
+            ],
+            "description": "action=read: 1 基结束行（含）。"
+          },
+          "maxChars": {
+            "type": "integer",
+            "default": 20000,
+            "aliases": [
+              "max_chars",
+              "maxStringLength"
+            ],
+            "description": "action=read: 返回内容的最大字符数。"
+          }
+        }
+      }
+    },
+    {
+      "name": "shader",
+      "summary": "Create, read, update and delete .shader files, with URP and Built-in templates.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "create",
+          "summary": "Create a .shader file from the URP or Built-in template, or explicit contents."
+        },
+        {
+          "name": "read",
+          "summary": "Read a shader file: line range and maximum characters."
+        },
+        {
+          "name": "update",
+          "summary": "Replace a shader file's contents."
+        },
+        {
+          "name": "delete",
+          "summary": "Move a shader file to the OS trash. Requires force=true."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "read",
+              "update",
+              "delete"
+            ],
+            "default": "create"
+          },
+          "name": {
+            "type": "string",
+            "description": "着色器名，拼成 {name}.shader；须匹配 ^[a-zA-Z_][a-zA-Z0-9_]*$。"
+          },
+          "path": {
+            "type": "string",
+            "description": "相对 Assets/ 的目录；空时默认 Shaders。"
+          },
+          "contents": {
+            "type": "string",
+            "description": "action=create/update: 着色器源码。"
+          },
+          "contentsEncoded": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "contents_encoded"
+            ]
+          },
+          "encodedContents": {
+            "type": "string",
+            "aliases": [
+              "encoded_contents"
+            ]
+          },
+          "template": {
+            "type": "string",
+            "default": "urp",
+            "description": "action=create: urp 或 builtin。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=delete: 必须显式确认。"
+          },
+          "startLine": {
+            "type": "integer",
+            "aliases": [
+              "start_line"
+            ],
+            "description": "action=read: 1 基起始行。"
+          },
+          "endLine": {
+            "type": "integer",
+            "aliases": [
+              "end_line"
+            ],
+            "description": "action=read: 1 基结束行（含）。"
+          },
+          "maxChars": {
+            "type": "integer",
+            "default": 20000,
+            "aliases": [
+              "max_chars"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "so",
+      "summary": "Create and patch ScriptableObject assets: create/create_so, modify/modify_so, with dryRun validation.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "create",
+          "summary": "Create a ScriptableObject asset from a type name plus optional patches."
+        },
+        {
+          "name": "create_so",
+          "summary": "Alias of create (MCP spelling)."
+        },
+        {
+          "name": "modify",
+          "summary": "Patch serialized properties on an existing ScriptableObject asset."
+        },
+        {
+          "name": "modify_so",
+          "summary": "Alias of modify (MCP spelling)."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "create_so",
+              "modify",
+              "modify_so"
+            ],
+            "default": "create"
+          },
+          "typeName": {
+            "type": "string",
+            "aliases": [
+              "type_name"
+            ],
+            "description": "action=create: ScriptableObject type name or full name."
+          },
+          "folderPath": {
+            "type": "string",
+            "aliases": [
+              "folder_path"
+            ],
+            "description": "action=create: Assets/ 下的目标目录."
+          },
+          "assetName": {
+            "type": "string",
+            "aliases": [
+              "asset_name"
+            ],
+            "description": "action=create: 文件名，可省略 .asset 后缀."
+          },
+          "overwrite": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create: 已存在时原地覆盖（保留 GUID）."
+          },
+          "target": {
+            "type": "object",
+            "description": "action=modify: {guid|path} 定位目标资产，guid 优先."
+          },
+          "targetGuid": {
+            "type": "string",
+            "aliases": [
+              "target_guid",
+              "guid"
+            ]
+          },
+          "targetPath": {
+            "type": "string",
+            "aliases": [
+              "target_path"
+            ]
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "dry_run"
+            ],
+            "description": "action=modify: 只校验不写盘."
+          },
+          "patches": {
+            "type": "array",
+            "description": "补丁数组，每项含 propertyPath、op 与 value。",
+            "items": {
+              "type": "object"
+            }
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "test",
+      "summary": "Unity Test Framework: start an EditMode or PlayMode run, poll its progress and failures, read the results.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": "com.unity.test-framework",
+      "effects": [
+        "editor.tests.run",
+        "editor.state.write"
+      ],
+      "actions": [
+        {
+          "name": "status",
+          "summary": "Poll a test job by jobId: progress, stuck detection and the first failures."
+        },
+        {
+          "name": "run",
+          "summary": "Start a test run. Returns jobId immediately; at most one job runs at a time."
+        },
+        {
+          "name": "result",
+          "summary": "Read the finished summary and the individual test cases (paged)."
+        },
+        {
+          "name": "list",
+          "summary": "List the retained test jobs (at most 10). Paged."
+        },
+        {
+          "name": "cancel",
+          "summary": "Mark the current test job as cancelled (Unity cannot abort a run in flight)."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "run",
+              "result",
+              "list",
+              "cancel"
+            ],
+            "default": "status"
+          },
+          "jobId": {
+            "type": "string",
+            "description": "action=status/result/cancel: test job id."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "Alias of 'jobId'."
+          },
+          "mode": {
+            "type": "string",
+            "description": "action=run: EditMode (default) or PlayMode."
+          },
+          "includeDetails": {
+            "type": "boolean",
+            "default": false,
+            "description": "Return every test case (paged)."
+          },
+          "include_details": {
+            "type": "boolean",
+            "default": false
+          },
+          "includeFailedTests": {
+            "type": "boolean",
+            "default": false,
+            "description": "Return only the cases that did not pass."
+          },
+          "include_failed_tests": {
+            "type": "boolean",
+            "default": false
+          },
+          "testNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "test_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "groupNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "group_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categoryNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "category_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assemblyNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assembly_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "initTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 600000,
+            "default": 15000
+          },
+          "init_timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 600000
+          },
+          "clearStuck": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=run: clear the stuck job instead of starting one."
+          },
+          "clear_stuck": {
+            "type": "boolean",
+            "default": false
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "texture",
+      "summary": "Create and edit texture assets: fill, sprite, modify, delete, pattern, gradient, noise and import settings.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "create",
+          "summary": "Create a texture from a fill colour, a pattern, explicit pixels or an image file."
+        },
+        {
+          "name": "create_sprite",
+          "summary": "Create a texture and configure it as a Sprite."
+        },
+        {
+          "name": "modify",
+          "summary": "Edit a pixel region and/or change the import settings of an existing texture."
+        },
+        {
+          "name": "delete",
+          "summary": "Delete a texture asset. Requires force=true."
+        },
+        {
+          "name": "apply_pattern",
+          "summary": "Rewrite a texture with a checker / stripes / grid / dots / brick pattern."
+        },
+        {
+          "name": "apply_gradient",
+          "summary": "Rewrite a texture with a linear or radial gradient."
+        },
+        {
+          "name": "apply_noise",
+          "summary": "Rewrite a texture with perlin or value noise."
+        },
+        {
+          "name": "set_import_settings",
+          "summary": "Write TextureImporter settings on an existing texture."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "create_sprite",
+              "modify",
+              "delete",
+              "apply_pattern",
+              "apply_gradient",
+              "apply_noise",
+              "set_import_settings"
+            ],
+            "default": "create"
+          },
+          "path": {
+            "type": "string",
+            "description": "资产路径，会自动补 Assets/ 前缀。"
+          },
+          "width": {
+            "type": "integer",
+            "default": 64,
+            "maximum": 4096
+          },
+          "height": {
+            "type": "integer",
+            "default": 64,
+            "maximum": 4096
+          },
+          "imagePath": {
+            "type": "string",
+            "aliases": [
+              "image_path"
+            ],
+            "description": "从磁盘图片加载（绝对路径或相对工程根）。"
+          },
+          "fillColor": {
+            "description": "底色：[r,g,b(,a)]，0-255 整数或 0-1 浮点。"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "checker / checkerboard / stripes / stripes_v / stripes_h / stripes_diag / dots / grid / brick。"
+          },
+          "patternSize": {
+            "type": "integer",
+            "default": 8,
+            "aliases": [
+              "pattern_size"
+            ]
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "array"
+            },
+            "description": "调色板，每项 [r,g,b(,a)]。"
+          },
+          "pixels": {
+            "description": "整图逐像素：颜色数组，或以 base64: 前缀给出的原始 RGBA32 字节。"
+          },
+          "gradientType": {
+            "type": "string",
+            "default": "linear",
+            "aliases": [
+              "gradient_type"
+            ],
+            "description": "linear 或 radial。"
+          },
+          "gradientAngle": {
+            "type": "number",
+            "default": 0,
+            "aliases": [
+              "gradient_angle"
+            ],
+            "description": "linear 渐变角度（度）。"
+          },
+          "gradient": {
+            "type": "object",
+            "description": "{colorKeys|keys|colors+stops, alphaKeys, mode}。"
+          },
+          "noiseType": {
+            "type": "string",
+            "default": "perlin",
+            "aliases": [
+              "noise_type"
+            ],
+            "description": "perlin 或 value。"
+          },
+          "noiseScale": {
+            "type": "number",
+            "default": 0.1,
+            "aliases": [
+              "noise_scale"
+            ],
+            "description": "Perlin 采样缩放。"
+          },
+          "octaves": {
+            "type": "integer",
+            "default": 1
+          },
+          "seed": {
+            "type": "integer",
+            "default": 0
+          },
+          "strength": {
+            "type": "number",
+            "default": 1.0,
+            "description": "噪声对比强度。"
+          },
+          "importSettings": {
+            "type": "object",
+            "aliases": [
+              "import_settings"
+            ]
+          },
+          "spriteSettings": {
+            "description": "{pivot, pixelsPerUnit}；旧版 Sprite 设置入口。"
+          },
+          "asSprite": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "as_sprite"
+            ]
+          },
+          "setPixels": {
+            "type": "object",
+            "aliases": [
+              "set_pixels"
+            ],
+            "description": "action=modify: {x,y,width,height,color|pixels}。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=delete: 必须显式确认。"
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          }
+        }
+      }
+    },
+    {
+      "name": "ui",
+      "summary": "UI Toolkit work: UXML/USS files, UIDocument wiring, PanelSettings and VisualElement editing (no uGUI, no RectTransform).",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "project.assets.read",
+        "project.assets.delete",
+        "ui.visualtree.write"
+      ],
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Round-trip probe reporting UI Toolkit availability and asset counts."
+        },
+        {
+          "name": "create",
+          "summary": "Create a .uxml or .uss file. Fails when the file already exists."
+        },
+        {
+          "name": "read",
+          "summary": "Read a .uxml or .uss file as text, optionally base64 encoded."
+        },
+        {
+          "name": "update",
+          "summary": "Overwrite an existing .uxml or .uss file."
+        },
+        {
+          "name": "attach_ui_document",
+          "summary": "Attach or update a UIDocument on a GameObject: visualTreeAsset, panelSettings, sortingOrder."
+        },
+        {
+          "name": "create_panel_settings",
+          "summary": "Create a PanelSettings .asset with scale mode, reference resolution and sorting order."
+        },
+        {
+          "name": "update_panel_settings",
+          "summary": "Write properties onto an existing PanelSettings .asset."
+        },
+        {
+          "name": "get_visual_tree",
+          "summary": "Dump the UIDocument visual tree, depth limited and item limited."
+        },
+        {
+          "name": "render_ui",
+          "summary": "Render the panel to a PNG under Assets/Docs~ and register it as an artifact."
+        },
+        {
+          "name": "link_stylesheet",
+          "summary": "Insert a <Style src=...> reference for a USS asset into a UXML file."
+        },
+        {
+          "name": "delete",
+          "summary": "Delete a .uxml or .uss file. Requires force."
+        },
+        {
+          "name": "list",
+          "summary": "List UXML, USS and PanelSettings assets, paged."
+        },
+        {
+          "name": "detach_ui_document",
+          "summary": "Clear the UIDocument source asset on a GameObject."
+        },
+        {
+          "name": "modify_visual_element",
+          "summary": "Set text, inline style, USS classes, enabled/visible and tooltip on a named element."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "create",
+              "read",
+              "update",
+              "attach_ui_document",
+              "create_panel_settings",
+              "update_panel_settings",
+              "get_visual_tree",
+              "render_ui",
+              "link_stylesheet",
+              "delete",
+              "list",
+              "detach_ui_document",
+              "modify_visual_element"
+            ],
+            "default": "ping"
+          },
+          "path": {
+            "type": "string",
+            "description": "UXML/USS path for create/read/update/delete/link_stylesheet, .asset path for create_panel_settings/update_panel_settings, search folder for list."
+          },
+          "contents": {
+            "type": "string",
+            "description": "action=create / update: full file text."
+          },
+          "encodedContents": {
+            "type": "string",
+            "description": "action=create / update: base64 file contents."
+          },
+          "contentsEncoded": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create / update: decode encodedContents as base64."
+          },
+          "target": {
+            "type": "string",
+            "description": "GameObject name, hierarchy path or instance id hosting the UIDocument."
+          },
+          "sourceAsset": {
+            "type": "string",
+            "description": "action=attach_ui_document: UXML asset path."
+          },
+          "panelSettings": {
+            "type": "string",
+            "description": "action=attach_ui_document: PanelSettings asset path."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "default": 0,
+            "description": "action=attach_ui_document: UIDocument.sortingOrder."
+          },
+          "settings": {
+            "type": "object",
+            "description": "action=create_panel_settings / update_panel_settings: PanelSettings property dictionary."
+          },
+          "scaleMode": {
+            "type": "string",
+            "description": "action=create_panel_settings: PanelScaleMode name."
+          },
+          "referenceResolution": {
+            "type": "object",
+            "description": "action=create_panel_settings: { width, height }."
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 10,
+            "description": "action=get_visual_tree: serialisation depth cap."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64,
+            "description": "action=get_visual_tree: element budget."
+          },
+          "maxStringLength": {
+            "type": "integer",
+            "default": 4096
+          },
+          "width": {
+            "type": "integer",
+            "default": 1920,
+            "description": "action=render_ui: output width."
+          },
+          "height": {
+            "type": "integer",
+            "default": 1080,
+            "description": "action=render_ui: output height."
+          },
+          "includeImage": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=render_ui: inline base64 PNG."
+          },
+          "maxResolution": {
+            "type": "integer",
+            "default": 640,
+            "description": "action=render_ui: longest side of the inlined image."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "action=render_ui: output file name; '.png' is appended when missing."
+          },
+          "outputFolder": {
+            "type": "string",
+            "description": "action=render_ui: output folder; defaults to Assets/Docs~/."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=render_ui / delete: overwrite or confirm a destructive change."
+          },
+          "stylesheet": {
+            "type": "string",
+            "description": "action=link_stylesheet: USS asset path."
+          },
+          "filterType": {
+            "type": "string",
+            "enum": [
+              "",
+              "uxml",
+              "VisualTreeAsset",
+              "uss",
+              "StyleSheet",
+              "PanelSettings"
+            ],
+            "description": "action=list: asset type filter."
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 50
+          },
+          "pageNumber": {
+            "type": "integer",
+            "default": 1
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "elementName": {
+            "type": "string",
+            "description": "action=modify_visual_element: UXML name attribute, resolved with rootVisualElement.Q(name)."
+          },
+          "text": {
+            "type": "string",
+            "description": "action=modify_visual_element: TextElement text; errors on a non-TextElement."
+          },
+          "addClasses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removeClasses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "toggleClasses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "style": {
+            "type": "object",
+            "description": "action=modify_visual_element: inline style dictionary (camelCase or kebab-case keys)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "action=modify_visual_element: element.SetEnabled(value)."
+          },
+          "visible": {
+            "type": "string",
+            "description": "action=modify_visual_element: 'true'/'1' maps to display=Flex, anything else to display=None."
+          },
+          "tooltip": {
+            "type": "string",
+            "description": "action=modify_visual_element: element.tooltip."
+          }
+        }
+      }
+    }
+  ],
+  "unityVersion": "2022.3.62f2c1"
+}

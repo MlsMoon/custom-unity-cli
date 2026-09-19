@@ -1,0 +1,33 @@
+# Unity requires LF for .meta and asset YAML it rewrites, and it is happiest when C# is CRLF.
+# Declaring this keeps the package byte-identical after a fresh clone on any platform.
+
+* text=auto
+
+*.cs        text eol=crlf
+*.asmdef    text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.ps1       text eol=crlf
+
+*.meta      text eol=lf
+*.asset     text eol=lf
+*.prefab    text eol=lf
+*.unity     text eol=lf
+
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.fbx       binary
+*.dll       binary
+*.so        binary
+*.dylib     binary
+*.bundle    binary
+*.a         binary
+*.lib       binary
+
+# Keep diffs readable in review and stop GitHub from collapsing generated files.
+*.asset     linguist-language=YAML
+*.prefab    linguist-language=YAML
+*.unity     linguist-language=YAML
