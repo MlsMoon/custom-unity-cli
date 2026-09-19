@@ -16,6 +16,10 @@ First public release.
   command line tooling Unity provides for that generation instead. See the Compatibility section of
   the README.
 - The 2021.3 LTS line is untested; it is no longer accepted by the package manifest.
+- **The boundary is enforced, not just documented.** The worker verifies the running Editor version
+  on first load and logs one warning, naming the actual version and pointing at Unity CLI, whenever it
+  is not 2022.3. Forward-compatibility guards mean the package compiles in a newer Editor, so without
+  this a Unity 6 user would get a working-looking install and no signal that it is untested.
 
 ### Added
 

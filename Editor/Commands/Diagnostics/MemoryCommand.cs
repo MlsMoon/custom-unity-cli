@@ -95,7 +95,12 @@ namespace CustomUnityCli.Editor
 
         public override CucliCommandResult Execute(CucliCommandContext context)
         {
+            // 'refs' is accepted as an alias for 'references'. The full name is long enough that callers
+            // shorten it, and a caller working from the MCP-derived spec may use either spelling, so the
+            // alias is normalised here rather than declared as a second action doing the same thing.
             string action = ResolveAction(context, "audit");
+            if (string.Equals(action, "refs", StringComparison.OrdinalIgnoreCase)) action = "references";
+
             switch (action)
             {
                 case "audit": return Audit(context);

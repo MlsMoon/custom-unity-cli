@@ -461,7 +461,7 @@ namespace CustomUnityCli.Editor
         {
             // Refresh() rebuilds the Unity Mesh from the ProBuilder data; skipping it would leave the
             // scene showing stale geometry and make every subsequent count read wrong.
-            ProBuilderReflect.Invoke(Mesh, "Refresh", new[] { mesh }, out _, out _);
+            ProBuilderReflect.InvokeInstance(mesh, "Refresh", Array.Empty<object>(), out _, out _);
             var component = mesh as Component;
             if (component != null) EditorUtility.SetDirty(component);
         }
@@ -471,7 +471,7 @@ namespace CustomUnityCli.Editor
         {
             object result;
             string error;
-            return ProBuilderReflect.Invoke(Mesh, "ToMesh", new[] { mesh }, out result, out error)
+            return ProBuilderReflect.InvokeInstance(mesh, "ToMesh", Array.Empty<object>(), out result, out error)
                 ? result as Mesh
                 : null;
         }
@@ -602,9 +602,10 @@ namespace CustomUnityCli.Editor
             // are attempted before giving up.
             object result;
             string invokeError;
-            bool imported = ProBuilderReflect.Invoke(importer, "Import", new[] { instance }, out result, out invokeError)
-                || ProBuilderReflect.Invoke(
-                    importer, "Import", new[] { instance, meshFilter.sharedMesh }, out result, out invokeError);
+            bool imported = ProBuilderReflect.InvokeInstance(
+                    instance, "Import", Array.Empty<object>(), out result, out invokeError)
+                || ProBuilderReflect.InvokeInstance(
+                    instance, "Import", new object[] { meshFilter.sharedMesh }, out result, out invokeError);
 
             if (!imported)
             {
@@ -844,8 +845,8 @@ namespace CustomUnityCli.Editor
         {
             object result;
             string error;
-            return ProBuilderReflect.Invoke(
-                Mesh, "SetPositions", new object[] { mesh, positions }, out result, out error);
+            return ProBuilderReflect.InvokeInstance(
+                mesh, "SetPositions", new object[] { positions }, out result, out error);
         }
 
         // ------------------------------------------------------------------ faces
@@ -883,8 +884,8 @@ namespace CustomUnityCli.Editor
             {
                 object result;
                 string invokeError;
-                if (ProBuilderReflect.Invoke(
-                        Mesh, "SetMaterial", new[] { mesh, face, (object)material }, out result, out invokeError))
+                if (ProBuilderReflect.InvokeInstance(
+                        mesh, "SetMaterial", new[] { face, (object)material }, out result, out invokeError))
                 {
                     applied++;
                 }
@@ -924,8 +925,8 @@ namespace CustomUnityCli.Editor
             {
                 object result;
                 string invokeError;
-                if (ProBuilderReflect.Invoke(
-                        Mesh, "SetFaceColor", new[] { mesh, face, (object)color }, out result, out invokeError))
+                if (ProBuilderReflect.InvokeInstance(
+                        mesh, "SetFaceColor", new[] { face, (object)color }, out result, out invokeError))
                 {
                     applied++;
                 }
@@ -1228,8 +1229,8 @@ namespace CustomUnityCli.Editor
 
             object ignored;
             string refreshError;
-            ProBuilderReflect.Invoke(
-                Mesh, "RefreshUV", new object[] { mesh, BuildFaceList(faces) }, out ignored, out refreshError);
+            ProBuilderReflect.InvokeInstance(
+                mesh, "RefreshUV", new object[] { BuildFaceList(faces) }, out ignored, out refreshError);
             Refresh(mesh);
 
             if (modified == 0)

@@ -50,6 +50,11 @@ guards — a `PhysicMaterial`/`PhysicsMaterial` alias, a reflection path for Uni
 Those exist so the assembly still *compiles* if someone opens the package in a newer Editor. They are
 not a claim of support, and nothing about the behaviour on those versions has been tested.
 
+Because compiling is not the same as being supported, the boundary is enforced rather than merely
+stated: on first load the worker checks the running Editor version and, when it is not 2022.3, logs a
+single warning naming the version and pointing at Unity CLI. You will see it in the Console the moment
+the package is imported, so nobody can install this on Unity 6 and mistake silence for a green light.
+
 ## Why another Unity CLI?
 
 Most Unity automation today means one of three things: an MCP server with a port and a client

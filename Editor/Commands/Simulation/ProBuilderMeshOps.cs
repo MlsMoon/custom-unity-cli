@@ -547,8 +547,8 @@ namespace CustomUnityCli.Editor
                 // Face.Reverse() is the documented way to flip a single face's winding.
                 object result;
                 string invokeError;
-                if (ProBuilderReflect.Invoke(
-                        ProBuilderSupport.FaceType, "Reverse", new[] { face }, out result, out invokeError))
+                if (ProBuilderReflect.InvokeInstance(
+                        face, "Reverse", Array.Empty<object>(), out result, out invokeError))
                 {
                     flipped++;
                 }
@@ -1370,6 +1370,79 @@ namespace CustomUnityCli.Editor
                 {
                     // The method was found and ran; its own failure is the real answer, so it is
                     // reported rather than masked by trying other overloads.
+                    error = (exception.InnerException ?? exception).GetBaseException().Message;
+                    return false;
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception.GetBaseException().Message);
+                }
+            }
+
+            error = "no overload of " + type.Name + "." + method + " matched ("
+                + string.Join(", ", failures.Distinct().Take(4)) + ").";
+            return false;
+        }
+
+        /// <summary>
+        /// Instance counterpart of <see cref="Invoke"/>. Most of the ProBuilder surface that matters
+        /// here is instance methods - <c>ProBuilderMesh.Refresh/ToMesh/SetPositions/SetMaterial/
+        /// SetFaceColor/RefreshUV</c>, <c>Face.Reverse</c>, <c>MeshImporter.Import</c> - so calling
+        /// them through the static overload (which searches BindingFlags.Static) silently finds
+        /// nothing and every one of those actions fails.
+        /// </summary>
+        internal static bool InvokeInstance(object target, string method, object[] args, out object result, out string error)
+        {
+            result = null;
+            error = null;
+            if (target == null)
+            {
+                error = "the instance is null.";
+                return false;
+            }
+
+            Type type = target.GetType();
+            args = args ?? Array.Empty<object>();
+            var candidates = type
+                .GetMethods(System.Reflection.BindingFlags.Public
+                            | System.Reflection.BindingFlags.NonPublic
+                            | System.Reflection.BindingFlags.Instance)
+                .Where(item => string.Equals(item.Name, method, StringComparison.Ordinal))
+                .Where(item => !item.IsGenericMethodDefinition)
+                .Where(item => item.GetParameters().Length == args.Length)
+                .ToArray();
+
+            if (candidates.Length == 0)
+            {
+                error = type.Name + "." + method + " taking " + args.Length + " argument(s) was not found.";
+                return false;
+            }
+
+            var failures = new List<string>();
+            foreach (var candidate in candidates)
+            {
+                System.Reflection.ParameterInfo[] parameters = candidate.GetParameters();
+                var converted = new object[args.Length];
+                bool usable = true;
+
+                for (int index = 0; index < args.Length; index++)
+                {
+                    if (TryCoerce(args[index], parameters[index].ParameterType, out converted[index])) continue;
+                    failures.Add(Describe(parameters[index].ParameterType) + " <- "
+                        + (args[index] == null ? "null" : args[index].GetType().Name));
+                    usable = false;
+                    break;
+                }
+
+                if (!usable) continue;
+
+                try
+                {
+                    result = candidate.Invoke(target, converted);
+                    return true;
+                }
+                catch (System.Reflection.TargetInvocationException exception)
+                {
                     error = (exception.InnerException ?? exception).GetBaseException().Message;
                     return false;
                 }

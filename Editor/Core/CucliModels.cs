@@ -76,6 +76,18 @@ namespace CustomUnityCli.Editor
         public string ActiveScenePath { get; set; }
         public int OpenSceneCount { get; set; }
         public int CommandCount { get; set; }
+
+        /// <summary>
+        /// Whether the Editor that is RUNNING is inside the supported Unity range.
+        ///
+        /// Deliberately separate from the project's declared version: Unity Hub can open a project with
+        /// a different Editor than <c>ProjectVersion.txt</c> names, and it is the running one that will
+        /// execute every command. The CLI reads this so a Unity 6 Editor is reported as out of scope
+        /// even when the project file still says 2022.3.
+        /// </summary>
+        public bool SupportedEditor { get; set; } = true;
+
+        public string UnsupportedEditorReason { get; set; }
     }
 
     internal sealed class CucliActionDescriptor

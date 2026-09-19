@@ -55,6 +55,7 @@ namespace CustomUnityCli.Editor
 
         public override CucliActionInfo[] Actions => Declare(
             "pointer-inspect", "What is under the pointer: UI elements with a safe text summary, the Scene-view object, and a game-view physics hit.",
+            "ui-pointer", "Spelled the way the MCP contract spells it. Identical to pointer-inspect; both names stay registered so neither caller breaks.",
             "move", "Move the pointer to a screen point.",
             "click", "Press and release a mouse button at a screen point, across separate frames.",
             "drag", "Press at a start point, move through waypoints, release.",
@@ -75,7 +76,7 @@ namespace CustomUnityCli.Editor
   ""properties"": {
     ""action"": {
       ""type"": ""string"",
-      ""enum"": [""pointer-inspect"", ""move"", ""click"", ""drag"", ""scroll"", ""key""],
+      ""enum"": [""pointer-inspect"", ""ui-pointer"", ""move"", ""click"", ""drag"", ""scroll"", ""key""],
       ""default"": ""pointer-inspect""
     },
     ""x"": { ""type"": ""number"", ""description"": ""Screen X. Origin is bottom-left, matching Screen and Input coordinates."" },
@@ -86,6 +87,7 @@ namespace CustomUnityCli.Editor
       ""description"": ""drag: waypoints as {x,y} or [x,y]. Also accepts @file.json containing a 'points' array."",
       ""items"": { ""type"": ""object"" }
     },
+    ""agent"": { ""type"": ""string"", ""description"": ""Gesture attribution, as in the MCP contract. Accepted and echoed back on the response; it never changes behaviour."" },
     ""deltaX"": { ""type"": ""number"", ""default"": 0 },
     ""deltaY"": { ""type"": ""number"", ""default"": 0 },
     ""scrollX"": { ""type"": ""number"", ""default"": 0 },
@@ -107,7 +109,8 @@ namespace CustomUnityCli.Editor
         {
             switch (ResolveAction(context, "pointer-inspect"))
             {
-                case "pointer-inspect": return PointerInspect(context);
+                case "pointer-inspect":
+                case "ui-pointer": return PointerInspect(context);
                 case "move": return Move(context);
                 case "scroll": return Scroll(context);
                 case "click":
@@ -1109,6 +1112,17 @@ namespace CustomUnityCli.Editor
                 });
         }
 
+        /// <summary>
+        /// MCP-style gesture attribution. It changes nothing about the injected input; it exists so a
+        /// caller driving several gestures in a row can match a response back to the request that
+        /// caused it. Null when the caller did not supply one, so it never appears as empty noise.
+        /// </summary>
+        private static string AgentOf(CucliCommandContext context)
+        {
+            string agent = context.Input.GetString("agent");
+            return string.IsNullOrWhiteSpace(agent) ? null : agent.Trim();
+        }
+
         private static void Drag(CucliCommandContext context, Action<CucliCommandResult> complete)
         {
             CucliArgs args = context.Input;
@@ -1140,6 +1154,9 @@ namespace CustomUnityCli.Editor
                 ["waypoints"] = waypoints.Count,
                 ["button"] = args.GetString("button") ?? "left"
             };
+
+            string agent = AgentOf(context);
+            if (agent != null) shape["agent"] = agent;
 
             RunGesture(
                 context, complete, "drag", shape,

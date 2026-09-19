@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -87,6 +89,12 @@ namespace CustomUnityCli.Editor
                 if (!s_initialized)
                 {
                     CucliPaths.EnsureDirectories();
+
+                    // Say it out loud rather than let a Unity 6 user assume support: the assembly
+                    // still compiles there thanks to forward-compatibility guards, so silence would
+                    // read as a green light. See CucliSupport for the boundary itself.
+                    CucliSupport.WarnIfUnsupported();
+
                     CucliCommandRegistry.Reload();
                     CucliCommandRegistry.WriteCatalog();
                     CucliConsoleCapture.Initialize(SessionId);
@@ -149,10 +157,19 @@ namespace CustomUnityCli.Editor
         /// </summary>
         private static void OnTimerTick()
         {
+            // The timer thread publishes the heartbeat and does nothing else.
+            //
+            // It must never touch a Unity API. An earlier revision called
+            // EditorApplication.QueuePlayerLoopUpdate() from here to nudge a throttled Editor into
+            // draining the queue, and that off-main-thread Editor call wedged the Editor's main loop
+            // permanently: state sampling and Editor.log both stopped at the same instant, CPU stayed
+            // at exactly 0% for minutes, and the Win32 message pump kept answering - a blocked main
+            // thread, not a modal dialog and not focus throttling. A try/catch cannot make such a call
+            // safe, because the failure mode is a corrupted native state, not a managed exception.
+            //
+            // Losing the nudge costs nothing that matters: the main thread drains the queue on its next
+            // natural tick, and `stalled` in the heartbeat is what tells a caller that no tick is coming.
             PublishHeartbeat();
-
-            if (!PendingWorkExists()) return;
-            NudgeMainLoop();
         }
 
         /// <summary>Cheap directory probe. Runs off the main thread, so it touches only the filesystem.</summary>
@@ -184,9 +201,13 @@ namespace CustomUnityCli.Editor
         }
 
         /// <summary>
-        /// Asks the editor loop to turn at least once, so a pending job is picked up without the
-        /// user having to focus the window. Guarded because Unity does not document this call as
-        /// thread-safe; if it refuses, the main thread still drains the queue whenever it next runs.
+        /// DO NOT CALL THIS. Kept only so the hazard is documented rather than rediscovered.
+        ///
+        /// It exists to ask the editor loop to turn once so a pending job is picked up without the
+        /// user focusing the window - a real problem worth solving. This implementation solved it by
+        /// calling <c>EditorApplication.QueuePlayerLoopUpdate()</c> off the main thread, which is not
+        /// safe and did wedge the Editor permanently. Any future attempt must use a mechanism Unity
+        /// documents as main-thread-only reachable, or must accept the wait.
         /// </summary>
         private static void NudgeMainLoop()
         {
@@ -229,7 +250,9 @@ namespace CustomUnityCli.Editor
                 OpenSceneCount = SceneManager.sceneCount,
                 CommandCount = CucliCommandRegistry.Count,
                 MainThreadTickAtUtc = s_mainThreadTickUtc,
-                PendingJobCount = CountPendingJobs()
+                PendingJobCount = CountPendingJobs(),
+                SupportedEditor = CucliSupport.IsSupportedEditor,
+                UnsupportedEditorReason = CucliSupport.UnsupportedReason
             };
         }
 
@@ -260,6 +283,13 @@ namespace CustomUnityCli.Editor
         /// Writes the current snapshot with a fresh timestamp. Safe to call from the timer thread:
         /// the snapshot is never mutated after publication, and <see cref="CucliPaths.WriteAtomic"/>
         /// needs no Unity API once <see cref="CucliPaths.WarmUp"/> has run.
+        ///
+        /// The snapshot is cloned through JSON and only the heartbeat's own timestamp is refreshed,
+        /// rather than copying field by field. A field-by-field copy silently drops whatever was added
+        /// to the model later - which is exactly how <c>MainThreadTickAtUtc</c>, the one honest
+        /// liveness signal in this file, was missing from the published heartbeat while the main thread
+        /// still looked perfectly healthy. Refreshing the timestamp is the only field this method is
+        /// allowed to touch: everything else must keep the main thread's value, including its age.
         /// </summary>
         private static void PublishHeartbeat()
         {
@@ -269,32 +299,13 @@ namespace CustomUnityCli.Editor
 
             try
             {
-                var published = new CucliHeartbeat
-                {
-                    SchemaVersion = snapshot.SchemaVersion,
-                    ProtocolVersion = snapshot.ProtocolVersion,
-                    WorkerVersion = snapshot.WorkerVersion,
-                    SessionId = snapshot.SessionId,
-                    TimestampUtc = DateTime.UtcNow.ToString("O"),
-                    StateSampledAtUtc = snapshot.StateSampledAtUtc,
-                    ProjectPath = snapshot.ProjectPath,
-                    ProjectName = snapshot.ProjectName,
-                    UnityVersion = snapshot.UnityVersion,
-                    ApplicationPath = snapshot.ApplicationPath,
-                    ProcessId = snapshot.ProcessId,
-                    HasCompilationErrors = snapshot.HasCompilationErrors,
-                    IsCompiling = snapshot.IsCompiling,
-                    IsUpdating = snapshot.IsUpdating,
-                    IsPlaying = snapshot.IsPlaying,
-                    IsPaused = snapshot.IsPaused,
-                    IsPlayingOrWillChangePlaymode = snapshot.IsPlayingOrWillChangePlaymode,
-                    IsBatchMode = snapshot.IsBatchMode,
-                    ActiveScenePath = snapshot.ActiveScenePath,
-                    OpenSceneCount = snapshot.OpenSceneCount,
-                    CommandCount = snapshot.CommandCount
-                };
+                JObject published = JObject.FromObject(
+                    snapshot, JsonSerializer.Create(CucliJson.CompactSettings));
+                published["timestampUtc"] = DateTime.UtcNow.ToString("O");
 
-                CucliPaths.WriteAtomic(CucliPaths.Heartbeat, CucliJson.Serialize(published));
+                CucliPaths.WriteAtomic(
+                    CucliPaths.Heartbeat,
+                    published.ToString(Formatting.Indented) + Environment.NewLine);
             }
             catch (Exception)
             {

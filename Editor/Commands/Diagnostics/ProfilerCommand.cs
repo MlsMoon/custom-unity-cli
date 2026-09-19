@@ -51,7 +51,20 @@ namespace CustomUnityCli.Editor
             "snapshot-compare", "比较两个快照的文件级元数据（不做对象级 diff）。",
             "frame-debugger-enable", "开启 Frame Debugger；Play Mode 未暂停时拒绝并提示先暂停。",
             "frame-debugger-disable", "关闭 Frame Debugger。",
-            "frame-debugger-events", "按游标分页读取 Frame Debugger 事件列表。");
+            "frame-debugger-events", "按游标分页读取 Frame Debugger 事件列表。",
+            "profiler_status", "Alias of status (MCP spelling).",
+            "profiler_start", "Alias of start (MCP spelling).",
+            "profiler_stop", "Alias of stop (MCP spelling).",
+            "profiler_set_areas", "Alias of set-areas (MCP spelling).",
+            "get_frame_timing", "Alias of frame-timing (MCP spelling).",
+            "get_counters", "Alias of counters (MCP spelling).",
+            "get_object_memory", "Alias of object-memory (MCP spelling).",
+            "memory_take_snapshot", "Alias of snapshot-take (MCP spelling).",
+            "memory_list_snapshots", "Alias of snapshot-list (MCP spelling).",
+            "memory_compare_snapshots", "Alias of snapshot-compare (MCP spelling).",
+            "frame_debugger_enable", "Alias of frame-debugger-enable (MCP spelling).",
+            "frame_debugger_disable", "Alias of frame-debugger-disable (MCP spelling).",
+            "frame_debugger_get_events", "Alias of frame-debugger-events (MCP spelling).");
 
         public override bool RequiresEditor => true;
 
@@ -80,7 +93,11 @@ namespace CustomUnityCli.Editor
       ""type"": ""string"",
       ""enum"": [""status"", ""ping"", ""start"", ""stop"", ""set-areas"", ""frame-timing"", ""counters"",
                  ""object-memory"", ""snapshot-take"", ""snapshot-list"", ""snapshot-compare"",
-                 ""frame-debugger-enable"", ""frame-debugger-disable"", ""frame-debugger-events""],
+                 ""frame-debugger-enable"", ""frame-debugger-disable"", ""frame-debugger-events"",
+                 ""profiler_status"", ""profiler_start"", ""profiler_stop"", ""profiler_set_areas"",
+                 ""get_frame_timing"", ""get_counters"", ""get_object_memory"",
+                 ""memory_take_snapshot"", ""memory_list_snapshots"", ""memory_compare_snapshots"",
+                 ""frame_debugger_enable"", ""frame_debugger_disable"", ""frame_debugger_get_events""],
       ""default"": ""status""
     },
     ""logFile"": { ""type"": ""string"", ""description"": ""start: 二进制日志输出路径；目录必须已存在。也接受 log_file."" },
@@ -111,7 +128,7 @@ namespace CustomUnityCli.Editor
 
         public override CucliCommandResult Execute(CucliCommandContext context)
         {
-            switch (ResolveAction(context, "status"))
+            switch (Normalize(ResolveAction(context, "status")))
             {
                 case "status": return Status();
                 case "ping": return Ping();
@@ -142,7 +159,7 @@ namespace CustomUnityCli.Editor
 
         public void ExecuteDeferred(CucliCommandContext context, Action<CucliCommandResult> complete)
         {
-            switch (ResolveAction(context, "status"))
+            switch (Normalize(ResolveAction(context, "status")))
             {
                 case "counters":
                     CountersDeferred(context, complete);
@@ -155,6 +172,37 @@ namespace CustomUnityCli.Editor
                 default:
                     complete(Execute(context));
                     return;
+            }
+        }
+
+        /// <summary>
+        /// Folds the MCP for Unity action spellings onto this group's canonical ones. MCP normalises an
+        /// action by trimming and dropping '-' and '_' before comparing, so <c>get_frame_timing</c>,
+        /// <c>get-frame-timing</c> and <c>getFrameTiming</c> are all the same request; the table below is
+        /// keyed on that de-punctuated form, which keeps every accepted spelling in one place.
+        /// </summary>
+        private static string Normalize(string action)
+        {
+            if (string.IsNullOrWhiteSpace(action)) return "status";
+            string value = action.Trim().ToLowerInvariant();
+            value = value.Replace("_", string.Empty).Replace("-", string.Empty).Replace(" ", string.Empty);
+            switch (value)
+            {
+                case "status": case "profilerstatus": return "status";
+                case "ping": return "ping";
+                case "start": case "profilerstart": return "start";
+                case "stop": case "profilerstop": return "stop";
+                case "setareas": case "profilersetareas": return "set-areas";
+                case "frametiming": case "getframetiming": return "frame-timing";
+                case "counters": case "getcounters": return "counters";
+                case "objectmemory": case "getobjectmemory": return "object-memory";
+                case "snapshottake": case "memorytakesnapshot": return "snapshot-take";
+                case "snapshotlist": case "memorylistsnapshots": return "snapshot-list";
+                case "snapshotcompare": case "memorycomparesnapshots": return "snapshot-compare";
+                case "framedebuggerenable": return "frame-debugger-enable";
+                case "framedebuggerdisable": return "frame-debugger-disable";
+                case "framedebuggerevents": case "framedebuggergetevents": return "frame-debugger-events";
+                default: return action.Trim().ToLowerInvariant();
             }
         }
 

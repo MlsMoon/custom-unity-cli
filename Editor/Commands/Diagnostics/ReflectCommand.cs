@@ -46,8 +46,8 @@ namespace CustomUnityCli.Editor
     ""memberName"": { ""type"": ""string"", ""description"": ""get-member: member to resolve, searched up the base chain."" },
     ""query"": { ""type"": ""string"", ""description"": ""search: case-insensitive name fragment."" },
     ""kind"": { ""type"": ""string"", ""enum"": [""any"", ""type"", ""method"", ""property"", ""field"", ""event""], ""default"": ""any"" },
-    ""includeInherited"": { ""type"": ""boolean"", ""default"": true, ""description"": ""get-type: include inherited members. True by default; set false, or use declaredOnly, for MCP's declared-only view."" },
-    ""declaredOnly"": { ""type"": ""boolean"", ""default"": false, ""description"": ""get-type: list only the members this type declares itself, matching MCP's get_type."" },
+    ""includeInherited"": { ""type"": ""boolean"", ""default"": false, ""description"": ""get-type: include members inherited from base types. False by default, matching MCP; pass true (or declaredOnly: false) for the full callable surface."" },
+    ""declaredOnly"": { ""type"": ""boolean"", ""default"": true, ""description"": ""get-type: list only the members this type declares itself. True by default, matching MCP's get_type."" },
     ""includeNoisy"": { ""type"": ""boolean"", ""default"": false, ""description"": ""get-type: include hideFlags/runInEditMode and friends."" },
     ""maxItems"": { ""type"": ""integer"", ""default"": 100, ""minimum"": 1, ""maximum"": 500 },
     ""pageSize"": { ""type"": ""integer"", ""default"": 100, ""minimum"": 1, ""maximum"": 500 },
@@ -109,15 +109,35 @@ namespace CustomUnityCli.Editor
                     new { typeName = requested });
             }
 
-            // Default to the full member picture, declared plus inherited, because "what can I call on
-            // this type" is the question a caller actually has. MCP's get_type answers the narrower
-            // "where is this declared" instead, so declaredOnly: true - or includeInherited: false -
-            // restores that semantic, and the response reports which view it used.
-            bool declaredOnly = context.Input.GetBool(
-                "declaredOnly", context.Input.GetBool("declared_only", false));
-            bool includeInherited = !declaredOnly
-                && context.Input.GetBool(
-                    "includeInherited", context.Input.GetBool("include_inherited", true));
+            // DeclaredOnly by default, matching MCP's get_type: the question it answers is "what does
+            // this type declare", and on a Unity type the inherited list is long enough to bury that
+            // answer. includeInherited: true (or declaredOnly: false) widens it to the full callable
+            // surface, and the response reports which view it used either way.
+            //
+            // Either spelling is honoured on its own: reading "declaredOnly defaults to true" and then
+            // requiring the caller to also negate it would make includeInherited: true silently do
+            // nothing, which is the sort of flag interaction nobody debugs twice.
+            bool declaredOnlySpecified =
+                context.Input.Has("declaredOnly") || context.Input.Has("declared_only");
+            bool includeInheritedSpecified =
+                context.Input.Has("includeInherited") || context.Input.Has("include_inherited");
+
+            bool includeInherited;
+            if (declaredOnlySpecified)
+            {
+                includeInherited = !context.Input.GetBool(
+                    "declaredOnly", context.Input.GetBool("declared_only", true));
+            }
+            else if (includeInheritedSpecified)
+            {
+                includeInherited = context.Input.GetBool(
+                    "includeInherited", context.Input.GetBool("include_inherited", false));
+            }
+            else
+            {
+                includeInherited = false;
+            }
+
             bool includeNoisy = context.Input.GetBool(
                 "includeNoisy", context.Input.GetBool("include_noisy", false));
             int maxItems = Clamp(context.Input.GetInt("maxItems", 100), 1, 500);
@@ -173,8 +193,8 @@ namespace CustomUnityCli.Editor
                 },
                 "已返回 " + items.Count + " / " + total + " 个成员（"
                 + (includeInherited
-                    ? "默认含继承成员；传 declaredOnly: true 可切回 MCP 的只列本类型声明成员语义"
-                    : "只列本类型声明的成员，等同 MCP 的 get_type")
+                    ? "含继承成员；这是有别于 MCP 的扩展视图，传 declaredOnly: true 可切回 MCP 语义"
+                    : "只列本类型声明的成员，等同 MCP 的 get_type；传 includeInherited: true 可扩展到继承链")
                 + "）。");
         }
 

@@ -31,25 +31,25 @@ namespace CustomUnityCli.Editor
 
         public override CucliActionInfo[] Actions => Declare(
             "ping", "Report the physics readiness summary: gravity, solver settings and simulation mode.",
-            "get-settings", "Read the 3D or 2D physics world settings.",
-            "set-settings", "Write whitelisted 3D or 2D physics world settings.",
-            "get-collision-matrix", "Read the layer collision matrix (lower triangle).",
-            "set-collision-matrix", "Enable or disable collision between two layers.",
-            "get-rigidbody", "Read a Rigidbody or Rigidbody2D.",
-            "configure-rigidbody", "Write whitelisted Rigidbody or Rigidbody2D properties.",
-            "apply-force", "Apply a force, torque or explosion to a rigidbody.",
-            "create-physics-material", "Create a PhysicMaterial (3D) or PhysicsMaterial2D resource.",
-            "configure-physics-material", "Write whitelisted physics material properties.",
-            "assign-physics-material", "Assign a physics material to a collider on a target.",
+            "get_settings", "Read the 3D or 2D physics world settings.",
+            "set_settings", "Write whitelisted 3D or 2D physics world settings.",
+            "get_collision_matrix", "Read the layer collision matrix (lower triangle).",
+            "set_collision_matrix", "Enable or disable collision between two layers.",
+            "get_rigidbody", "Read a Rigidbody or Rigidbody2D.",
+            "configure_rigidbody", "Write whitelisted Rigidbody or Rigidbody2D properties.",
+            "apply_force", "Apply a force, torque or explosion to a rigidbody.",
+            "create_physics_material", "Create a PhysicMaterial (3D) or PhysicsMaterial2D resource.",
+            "configure_physics_material", "Write whitelisted physics material properties.",
+            "assign_physics_material", "Assign a physics material to a collider on a target.",
             "raycast", "Cast a ray and return the first hit.",
-            "raycast-all", "Cast a ray and return every hit.",
+            "raycast_all", "Cast a ray and return every hit.",
             "linecast", "Cast between two points and return the first hit.",
             "shapecast", "Sweep a sphere, box or capsule and return the first hit.",
             "overlap", "Return every collider overlapping a sphere, box or capsule.",
-            "simulate-step", "Advance the physics world manually and report rigidbody motion.",
-            "add-joint", "Add a joint to a target.",
-            "configure-joint", "Configure an existing joint's properties, motor, limits, spring or drive.",
-            "remove-joint", "Remove joints from a target.",
+            "simulate_step", "Advance the physics world manually and report rigidbody motion.",
+            "add_joint", "Add a joint to a target.",
+            "configure_joint", "Configure an existing joint's properties, motor, limits, spring or drive.",
+            "remove_joint", "Remove joints from a target.",
             "validate", "Sweep the loaded scenes for common physics misconfigurations.");
 
         public override bool RequiresEditor => true;
@@ -69,11 +69,11 @@ namespace CustomUnityCli.Editor
   ""properties"": {
     ""action"": {
       ""type"": ""string"",
-      ""enum"": [""ping"", ""get-settings"", ""set-settings"", ""get-collision-matrix"", ""set-collision-matrix"",
-                 ""get-rigidbody"", ""configure-rigidbody"", ""apply-force"",
-                 ""create-physics-material"", ""configure-physics-material"", ""assign-physics-material"",
-                 ""raycast"", ""raycast-all"", ""linecast"", ""shapecast"", ""overlap"", ""simulate-step"",
-                 ""add-joint"", ""configure-joint"", ""remove-joint"", ""validate""]
+      ""enum"": [""ping"", ""get_settings"", ""set_settings"", ""get_collision_matrix"", ""set_collision_matrix"",
+                 ""get_rigidbody"", ""configure_rigidbody"", ""apply_force"",
+                 ""create_physics_material"", ""configure_physics_material"", ""assign_physics_material"",
+                 ""raycast"", ""raycast_all"", ""linecast"", ""shapecast"", ""overlap"", ""simulate_step"",
+                 ""add_joint"", ""configure_joint"", ""remove_joint"", ""validate""]
     },
     ""dimension"": { ""type"": ""string"", ""enum"": [""3d"", ""2d"", ""both""], ""description"": ""3d (default), 2d, or both for validate."" },
     ""target"": { ""type"": ""string"", ""description"": ""GameObject name, hierarchy path or instance id."" },
@@ -155,7 +155,7 @@ namespace CustomUnityCli.Editor
         }
 
         /// <summary>
-        /// Accepts <c>get-settings</c>, <c>get_settings</c> and <c>getSettings</c> for the same
+        /// Accepts <c>get_settings</c>, <c>get_settings</c> and <c>getSettings</c> for the same
         /// action. The CLI's own convention is hyphenated, the MCP source spells the same operations
         /// with underscores, and making a caller remember which is which is pure friction.
         /// </summary>
@@ -526,13 +526,28 @@ namespace CustomUnityCli.Editor
             if (dimension == Dimension2D) Physics2D.IgnoreLayerCollision(layerA, layerB, !collide);
             else Physics.IgnoreLayerCollision(layerA, layerB, !collide);
 
+            // The layer collision matrix lives in ProjectSettings/DynamicsManager.asset (3D) and
+            // Physics2DSettings.asset (2D). IgnoreLayerCollision mutates the live settings object, so
+            // SaveAssets is what makes the change survive a restart.
+            //
+            // The serialized m_LayerCollisionMatrix array is deliberately NOT hand-written: its bit
+            // polarity (1 = collides or 1 = ignores) cannot be confirmed by reading the API surface,
+            // and writing it inverted would silently corrupt the whole project's collision matrix.
+            // The authoritative API is used instead, and the message states what was persisted.
+            AssetDatabase.SaveAssets();
+
             return CucliCommandResult.Ok(new
             {
                 layerA = LayerLabel(layerA),
                 layerB = LayerLabel(layerB),
                 collide,
-                dimension
-            }, collide ? "已恢复两层之间的碰撞。" : "已关闭两层之间的碰撞。");
+                dimension,
+                persisted = dimension == Dimension2D
+                    ? "Physics2DSettings.asset"
+                    : "DynamicsManager.asset",
+                saved = true
+            }, (collide ? "已恢复" : "已关闭") + "两层之间的 " + dimension + " 碰撞，并写入 "
+                + (dimension == Dimension2D ? "Physics2DSettings.asset" : "DynamicsManager.asset") + "。");
         }
 
         // ------------------------------------------------------------------ simulate

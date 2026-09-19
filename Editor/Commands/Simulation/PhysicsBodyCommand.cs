@@ -197,7 +197,96 @@ namespace CustomUnityCli.Editor
             return CucliCommandResult.Ok(new { target = target.name, dimension, changed });
         }
 
+        /// <summary>
+        /// Writes one whitelisted rigidbody property.
+        ///
+        /// The SerializedObject path is tried first because it is the only one that registers Undo,
+        /// records a prefab override and marks the object dirty - the same guarantees an Inspector
+        /// edit gives. Reflection is the fallback for anything this Unity version names differently
+        /// or does not serialise under the expected path.
+        /// </summary>
         private static bool ApplyBodyProperty(string dimension, object body, string key, JToken value, out string error)
+        {
+            error = null;
+            var component = body as UnityEngine.Object;
+            if (component == null)
+            {
+                error = "the rigidbody is not a Unity object.";
+                return false;
+            }
+
+            string serializedPath = SerializedPathFor(dimension, key);
+            if (serializedPath != null)
+            {
+                bool handled;
+                string serializedError;
+                if (CucliSerialized.TrySet(
+                        component, serializedPath, value, "cucli physics configure-rigidbody",
+                        out serializedError, out handled))
+                {
+                    return true;
+                }
+
+                if (handled)
+                {
+                    error = serializedError;
+                    return false;
+                }
+            }
+
+            return ApplyBodyPropertyByReflection(dimension, body, key, value, out error);
+        }
+
+        /// <summary>
+        /// Serialized field paths behind the whitelist keys, or null when none applies (in which case
+        /// the reflection fallback takes over). 2D and 3D share the keys but not the field names.
+        /// </summary>
+        private static string SerializedPathFor(string dimension, string key)
+        {
+            if (dimension == PhysicsCommand.Dimension2D)
+            {
+                switch (key)
+                {
+                    case "mass": return "m_Mass";
+                    case "gravityscale": return "m_GravityScale";
+                    case "bodytype": return "m_BodyType";
+                    case "simulated": return "m_Simulated";
+                    case "collisiondetectionmode": return "m_CollisionDetection";
+                    case "constraints": return "m_Constraints";
+                    case "drag":
+                    case "lineardamping": return "m_LinearDamping";
+                    case "angulardrag":
+                    case "angulardamping": return "m_AngularDamping";
+                }
+
+                return null;
+            }
+
+            switch (key)
+            {
+                case "mass": return "m_Mass";
+                case "usegravity": return "m_UseGravity";
+                case "iskinematic": return "m_IsKinematic";
+                case "interpolation": return "m_Interpolate";
+                case "collisiondetectionmode": return "m_CollisionDetection";
+                case "constraints": return "m_Constraints";
+#if UNITY_6000_0_OR_NEWER
+                case "drag":
+                case "lineardamping": return "m_LinearDamping";
+                case "angulardrag":
+                case "angulardamping": return "m_AngularDamping";
+#else
+                case "drag":
+                case "lineardamping": return "m_Drag";
+                case "angulardrag":
+                case "angulardamping": return "m_AngularDrag";
+#endif
+            }
+
+            return null;
+        }
+
+        private static bool ApplyBodyPropertyByReflection(string dimension, object body, string key, JToken value, out string error)
         {
             error = null;
             try

@@ -123,3 +123,34 @@ can block on it, and the CLI already blocks for you unless you pass `--detach`.
   scene contains duplicate names.
 - MCP's per-tool group visibility (some tools start hidden and need `manage_tools` activation) has no
   equivalent: every `cucli` group is always present, and the catalog states what each one needs.
+- **`profiler` canonicalises 13 of MCP's action names, and accepts both spellings.**
+  `manage_profiler`'s actions carry a redundant `profiler_` / `memory_` / `frame_debugger_` prefix
+  that the group name already provides, so the canonical `cucli` name drops it and uses kebab-case.
+  Every MCP spelling below is registered as an **alias**, not a rejection, so a caller ported
+  straight from MCP keeps working; only the error message and `--help` show the canonical name:
+
+  | MCP | `cucli` canonical |
+  | --- | --- |
+  | `profiler_start` / `profiler_stop` / `profiler_status` | `start` / `stop` / `status` |
+  | `profiler_set_areas` | `set-areas` |
+  | `get_frame_timing` / `get_counters` / `get_object_memory` | `frame-timing` / `counters` / `object-memory` |
+  | `memory_take_snapshot` / `memory_list_snapshots` / `memory_compare_snapshots` | `snapshot-take` / `snapshot-list` / `snapshot-compare` |
+  | `frame_debugger_enable` / `_disable` / `_get_events` | `frame-debugger-enable` / `-disable` / `-events` |
+  | `ping` | `ping` |
+
+  Action matching folds case and ignores `-` / `_` / spaces, the way MCP compares actions, so
+  `get_frame_timing`, `get-frame-timing` and `getFrameTiming` are one request. Aliases are declared
+  in the group's `Actions` list and enumerated in its schema, which is what keeps them visible to
+  `cucli commands` and to `verify.ps1` gate 3 rather than being an undocumented back door.
+
+  `vfx` (63/63) and `scene` / `graphics` keep MCP's snake_case names verbatim, so the package is
+  still **internally inconsistent about naming style**; the difference is that a name now works
+  whether or not you know which style its group chose.
+- **`profiler counters` returns four keys per row, not three.** MCP emits `<name>`, `<name>_valid`
+  and `<name>_unit` fanned into one key space; `cucli` emits a row `{name, value, valid, unit}`, which
+  is easier to parse. The extra `valid` is deliberate and must not be removed: a `ProfilerRecorder`
+  returns zero or invalid readings until the player loop has settled, so dropping the flag would hide
+  "this number is not trustworthy yet" and make the tool lie.
+- `vfx` is gated per action, not per group: only the 23 `vfx_*` actions require
+  `com.unity.visualeffectgraph`. The 39 `particle_*` / `line_*` / `trail_*` actions use built-in
+  UnityEngine types and work in a project that has no VFX Graph at all.

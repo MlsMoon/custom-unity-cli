@@ -157,12 +157,24 @@ namespace CustomUnityCli.Editor
 
             object result;
             string compileError;
-            if (!TryCompileAndInvoke(source, out result, out compileError))
+            JArray compileDiagnostics;
+            int compileDiagnosticCount;
+            if (!TryCompileAndInvoke(
+                    source, out result, out compileError, out compileDiagnostics, out compileDiagnosticCount))
             {
                 RecordHistory(context, source, false, compileError);
                 return CucliCommandResult.Fail(
                     CucliErrors.CompileError, compileError,
-                    new { safetyChecks, safetyNotice = SafetyNotice });
+                    new
+                    {
+                        // Structured on purpose: a caller should be able to point at one error rather
+                        // than parse prose, and the raw compiler output is never dumped.
+                        errors = compileDiagnostics,
+                        errorCount = compileDiagnosticCount,
+                        errorsTruncated = compileDiagnostics != null && compileDiagnosticCount > compileDiagnostics.Count,
+                        safetyChecks,
+                        safetyNotice = SafetyNotice
+                    });
             }
 
             RecordHistory(context, source, true, null);
@@ -191,10 +203,17 @@ namespace CustomUnityCli.Editor
             return null;
         }
 
-        private static bool TryCompileAndInvoke(string body, out object result, out string error)
+        private static bool TryCompileAndInvoke(
+            string body,
+            out object result,
+            out string error,
+            out JArray compileDiagnostics,
+            out int compileDiagnosticCount)
         {
             result = null;
             error = null;
+            compileDiagnostics = null;
+            compileDiagnosticCount = 0;
 
             // No CodeDom-shaped type may be NAMED here: naming one would need a compile-time reference
             // this assembly does not have, and a missing reference is a build error for the whole
@@ -287,10 +306,13 @@ namespace CustomUnityCli.Editor
                 return false;
             }
 
-            string compileErrors = FormatCompilerErrors(results);
-            if (compileErrors != null)
+            int errorCount;
+            JArray diagnostics = CompileDiagnostics(results, out errorCount);
+            if (diagnostics != null)
             {
-                error = compileErrors;
+                compileDiagnostics = diagnostics;
+                compileDiagnosticCount = errorCount;
+                error = DescribeCompileDiagnostics(diagnostics, errorCount);
                 return false;
             }
 
@@ -413,37 +435,83 @@ namespace CustomUnityCli.Editor
         }
 
         /// <summary>
-        /// Renders the first few CodeDom diagnostics, or null when the compilation produced no errors.
+        /// The compiler diagnostics as structured entries: id, line, column and message.
+        ///
+        /// Returned as data rather than prose so a caller can act on one specific error, and capped so
+        /// that a single syntax mistake cannot produce a wall of cascading diagnostics. Line numbers
+        /// are shifted back by the wrapper's preamble so they refer to the caller's own snippet rather
+        /// than to the generated file, and columns are left alone because prepending lines does not
+        /// move anything horizontally.
+        ///
+        /// Returns null when the compilation produced no errors, so callers can use null as "compiled".
         /// </summary>
-        private static string FormatCompilerErrors(object results)
+        private static JArray CompileDiagnostics(object results, out int totalErrors)
         {
+            totalErrors = 0;
             object errors = GetPropertyValue(results, "Errors");
             if (errors == null) return null;
 
             object flag = GetPropertyValue(errors, "HasErrors");
             if (!(flag is bool) || !(bool)flag) return null;
 
-            var builder = new StringBuilder();
-            int reported = 0;
+            const int reported = 20;
+            const int preambleLines = 8;
+
+            var array = new JArray();
             var items = errors as IEnumerable;
-            if (items != null)
+            if (items == null) return array;
+
+            foreach (object item in items)
             {
-                foreach (object item in items)
+                object warning = GetPropertyValue(item, "IsWarning");
+                if (warning is bool && (bool)warning) continue;
+
+                totalErrors++;
+                if (array.Count >= reported) continue;
+
+                int line = 0;
+                object rawLine = GetPropertyValue(item, "Line");
+                if (rawLine is int) line = (int)rawLine;
+                if (line > preambleLines) line -= preambleLines;
+                if (line < 1) line = 1;
+
+                int column = 0;
+                object rawColumn = GetPropertyValue(item, "Column");
+                if (rawColumn is int) column = (int)rawColumn;
+
+                object number = GetPropertyValue(item, "ErrorNumber");
+                object text = GetPropertyValue(item, "ErrorText");
+
+                array.Add(new JObject
                 {
-                    object warning = GetPropertyValue(item, "IsWarning");
-                    if (warning is bool && (bool)warning) continue;
-                    if (reported++ >= 5) break;
+                    ["id"] = number == null || string.IsNullOrWhiteSpace(number.ToString())
+                        ? "CS0000"
+                        : number.ToString(),
+                    ["line"] = line,
+                    ["column"] = column,
+                    ["message"] = text == null ? "unknown compile error" : text.ToString()
+                });
+            }
 
-                    // The generated wrapper adds 8 lines of preamble, so report a caller-relative line.
-                    int line = 0;
-                    object rawLine = GetPropertyValue(item, "Line");
-                    if (rawLine is int) line = (int)rawLine;
-                    if (line > 8) line -= 8;
+            return array;
+        }
 
-                    object text = GetPropertyValue(item, "ErrorText");
-                    builder.Append("line ").Append(line).Append(": ")
-                        .Append(text == null ? "unknown compile error" : text.ToString()).Append('\n');
-                }
+        /// <summary>Human-readable summary of the first few diagnostics, for the message field.</summary>
+        private static string DescribeCompileDiagnostics(JArray diagnostics, int totalErrors)
+        {
+            var builder = new StringBuilder();
+            int shown = Math.Min(5, diagnostics == null ? 0 : diagnostics.Count);
+            for (int index = 0; index < shown; index++)
+            {
+                JToken item = diagnostics[index];
+                builder.Append("line ").Append(item["line"]).Append(", column ").Append(item["column"])
+                    .Append(": ").Append(item["id"]).Append(' ').Append(item["message"]).Append('\n');
+            }
+
+            if (totalErrors > shown)
+            {
+                builder.Append("...and ").Append(totalErrors - shown)
+                    .Append(" more; the full list is in data.errors.\n");
             }
 
             return "The snippet did not compile:\n" + builder.ToString().TrimEnd();
@@ -703,41 +771,51 @@ namespace CustomUnityCli.Editor
 
         private static CucliCommandResult History(CucliCommandContext context)
         {
-            if (!File.Exists(HistoryPath))
-            {
-                return CucliCommandResult.Ok(new { count = 0, entries = new JArray() });
-            }
+            var entries = new List<JObject>();
 
-            int limit = Mathf.Clamp(context.Input.GetInt("limit", 20), 1, HistoryLimit);
-            var entries = new JArray();
-            string[] lines;
-            try
+            if (File.Exists(HistoryPath))
             {
-                lines = File.ReadAllLines(HistoryPath, CucliJson.Utf8NoBom);
-            }
-            catch (IOException exception)
-            {
-                return CucliCommandResult.Fail(CucliErrors.CommandFailed, exception.Message);
-            }
-
-            int total = lines.Length;
-            for (int index = Math.Max(0, total - limit); index < total; index++)
-            {
-                if (string.IsNullOrWhiteSpace(lines[index])) continue;
+                string[] lines;
                 try
                 {
-                    JObject entry = CucliJson.ParseObject(lines[index]);
-                    entry["index"] = index;
-                    // The full source is not echoed by default: it can be thousands of characters.
-                    if (!context.Input.GetBool("includeCode", false)) entry.Remove("code");
-                    entries.Add(entry);
+                    lines = File.ReadAllLines(HistoryPath, CucliJson.Utf8NoBom);
                 }
-                catch (Newtonsoft.Json.JsonException)
+                catch (IOException exception)
                 {
+                    return CucliCommandResult.Fail(CucliErrors.CommandFailed, exception.Message);
+                }
+
+                bool includeCode = context.Input.GetBool("includeCode", false);
+
+                // Newest first: the reason to open the history is almost always the run you just did.
+                for (int index = lines.Length - 1; index >= 0; index--)
+                {
+                    if (string.IsNullOrWhiteSpace(lines[index])) continue;
+                    try
+                    {
+                        JObject entry = CucliJson.ParseObject(lines[index]);
+                        // The ABSOLUTE line index is kept so it can be handed straight back to
+                        // `replay --index`, which addresses the file rather than the current page.
+                        entry["index"] = index;
+                        // The full source is not echoed by default: it can be thousands of characters.
+                        if (!includeCode) entry.Remove("code");
+                        entries.Add(entry);
+                    }
+                    catch (Newtonsoft.Json.JsonException)
+                    {
+                    }
                 }
             }
 
-            return CucliCommandResult.Ok(new { total, returned = entries.Count, entries });
+            CucliPage<JObject> page = CucliPaging.Slice(entries, context.Input, 20);
+            var items = new JArray();
+            foreach (JObject entry in page.Items) items.Add(entry);
+
+            return CucliCommandResult.Ok(CucliPaging.Envelope(page, items, new JObject
+            {
+                ["historyPath"] = HistoryPath,
+                ["order"] = "newest first"
+            }));
         }
 
         private static CucliCommandResult ClearHistory(CucliCommandContext context)
@@ -809,14 +887,6 @@ namespace CustomUnityCli.Editor
         }
 
         /// <summary>
-        /// Creates the CodeDom C# provider without a compile-time reference to Microsoft.CSharp.
-        ///
-        /// The assembly is present in a normal Editor installation but is not part of the reference
-        /// set an Editor assembly is compiled against, so `using Microsoft.CSharp;` breaks the build
-        /// for everyone. Loading it by name keeps the fallback compiler working where it exists and
-        /// degrades to a clear message where it does not.
-        /// </summary>
-        /// <summary>
         /// Whether a Roslyn C# compiler is loaded in this Editor.
         ///
         /// Roslyn ships as a set of NuGet assemblies (Microsoft.CodeAnalysis, ...CSharp, Microsoft.CSharp)
@@ -833,6 +903,14 @@ namespace CustomUnityCli.Editor
                        "Microsoft.CodeAnalysis", "Microsoft.CodeAnalysis.SyntaxTree");
         }
 
+        /// <summary>
+        /// Creates the CodeDom C# provider without a compile-time reference to Microsoft.CSharp.
+        ///
+        /// The assembly is present in a normal Editor installation but is not part of the reference
+        /// set an Editor assembly is compiled against, so `using Microsoft.CSharp;` breaks the build
+        /// for everyone. Loading it by name keeps the fallback compiler working where it exists and
+        /// degrades to a clear message where it does not.
+        /// </summary>
         private static object CreateProvider(out string error)
         {
             error = null;

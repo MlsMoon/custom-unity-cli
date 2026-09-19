@@ -328,16 +328,25 @@ function Get-HeartbeatAgeSeconds {
 
 function Get-HeartbeatStateAgeSeconds {
     <#
-        Age of the last MAIN-THREAD state sample.
+        Age of the last MAIN-THREAD signal.
 
         This is the honest liveness number and it is not the same as the heartbeat's own timestamp.
         The heartbeat is republished from a background timer so that it stays fresh even while the
         main thread is blocked - which means a frozen Editor looks perfectly healthy if you only read
         `timestampUtc`. Job execution runs on the main thread, so once this age grows the queue cannot
         drain no matter how long a caller waits.
+
+        `mainThreadTickAtUtc` is the precise signal (stamped on every editor update);
+        `stateSampledAtUtc` is the older, coarser one (stamped when the state fields are refreshed,
+        about once a second). Prefer the precise one and fall back, so the check works against both
+        the current and an older heartbeat.
     #>
     param($Heartbeat)
     if ($null -eq $Heartbeat) { return $null }
+
+    $tickAge = Get-TimestampAgeSeconds $Heartbeat.mainThreadTickAtUtc
+    if ($null -ne $tickAge) { return $tickAge }
+
     return Get-TimestampAgeSeconds $Heartbeat.stateSampledAtUtc
 }
 
@@ -1189,6 +1198,12 @@ function Invoke-HostStatus {
             # executing", which is exactly what a caller needs to distinguish from "gone" - and it is
             # why Test-WorkerOnline requires both.
             stateSampledAtUtc = if ($heartbeat) { $heartbeat.stateSampledAtUtc } else { $null }
+            mainThreadTickAtUtc = if ($heartbeat) { $heartbeat.mainThreadTickAtUtc } else { $null }
+            pendingJobCount = if ($heartbeat) { $heartbeat.pendingJobCount } else { $null }
+            # The RUNNING Editor's support verdict. Distinct from the project's declared version: Unity
+            # Hub can open a project with a different Editor, and that is the one executing commands.
+            supportedEditor = if ($heartbeat) { $heartbeat.supportedEditor } else { $null }
+            unsupportedEditorReason = if ($heartbeat) { $heartbeat.unsupportedEditorReason } else { $null }
             stateAgeSeconds = if ($null -eq ($stateAge = Get-HeartbeatStateAgeSeconds $heartbeat)) {
                 $null
             } else {
@@ -1223,6 +1238,9 @@ function Invoke-HostStatus {
     }
     if ($heartbeat -and $heartbeat.hasCompilationErrors) {
         $warnings += "The Editor reports script compilation errors; asset writes may be rejected."
+    }
+    if ($heartbeat -and $heartbeat.supportedEditor -eq $false) {
+        $warnings += "The RUNNING Editor is outside the supported range. " + $(if ($heartbeat.unsupportedEditorReason) { $heartbeat.unsupportedEditorReason } else { "This package targets Unity 2022 (verified on 2022.3)." })
     }
 
     return Write-CucliResult -Success $true -Command 'status' -Action 'show' -Data $data `
@@ -1367,6 +1385,18 @@ function Invoke-HostDoctor {
             } else {
                 "The Editor's main thread is ticking (last sample $([int]$stateAge)s ago)."
             }) 'error'
+    }
+
+    # The project file and the running Editor can disagree - Unity Hub will happily open a project with
+    # a different Editor than ProjectVersion.txt names - and it is the RUNNING one that executes every
+    # command. The worker reports its own verdict, so this check catches the case the file cannot.
+    if ($heartbeat -and $heartbeat.supportedEditor -eq $false) {
+        & $addCheck 'unity.runningEditor' $false `
+            ("The Editor that is actually running is out of scope: " +
+             $(if ($heartbeat.unsupportedEditorReason) { $heartbeat.unsupportedEditorReason } else { "this package targets Unity 2022 (verified on 2022.3)" })) 'error'
+    } elseif ($heartbeat -and $heartbeat.supportedEditor -eq $true) {
+        & $addCheck 'unity.runningEditor' $true `
+            "The running Editor ($($heartbeat.unityVersion)) is inside the supported range." 'warning'
     }
 
     if ($online) {
