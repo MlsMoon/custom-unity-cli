@@ -114,6 +114,19 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
         } else {
             Add-Failure "package.json must declare com.unity.nuget.newtonsoft-json; the Editor sources need it."
         }
+
+        # The supported Unity line is a stated policy, and a stated policy silently drifts unless
+        # something checks it. The README says Unity 2022, `cucli doctor` refuses Unity 6, and this
+        # gate keeps the manifest floor from being widened without a deliberate decision to widen
+        # support - which would also mean re-verifying the Editor worker on that version.
+        if ($manifest.unity -and $manifest.unity -ne '2022.3') {
+            Add-Failure ("package.json unity floor is '$($manifest.unity)' but this package supports " +
+                         "Unity 2022.3 only. Widening it is a support decision: the Editor worker, the " +
+                         "file protocol and every command would need re-verifying on the new floor, and " +
+                         "the README + doctor verdict would have to change with it.")
+        } elseif ($manifest.unity) {
+            Add-Pass "unity floor is 2022.3, matching the documented and verified target."
+        }
     } catch {
         Add-Failure "package.json is not valid JSON: $($_.Exception.Message)"
     }
