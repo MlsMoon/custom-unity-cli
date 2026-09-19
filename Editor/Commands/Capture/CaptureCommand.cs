@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -12,36 +11,35 @@ using Object = UnityEngine.Object;
 namespace CustomUnityCli.Editor
 {
     /// <summary>
-    /// <c>cucli capture ...</c> - turn what the Editor is showing into a PNG on disk.
+    /// <c>cucli capture ...</c> - one screenshot at a time.
     ///
-    /// The honest part of this group is what it refuses to pretend. A camera render contains the 3D
-    /// world but <em>not</em> a Screen Space Overlay canvas, because that UI is composited by the game
-    /// view rather than by any camera. So the default <c>game</c> capture is a camera render and says
-    /// <c>includesOverlayUI: false</c>; the overlay-inclusive path is opt-in via
-    /// <c>--include-ui</c>, requires Play Mode, and is deferred to the end of a frame.
+    /// The distinction that matters is stated in every result. A camera render contains the 3D world but
+    /// <b>not</b> a Screen Space Overlay canvas, because that UI is composited by the game view rather
+    /// than by any camera. So <c>game</c> renders a camera and reports <c>includesOverlayUI: false</c>;
+    /// the composited image is opt-in through <c>--include-ui</c>, which needs Play Mode and waits for the
+    /// end of a frame. A caller that does not know the difference will spend a long time wondering where
+    /// the UI went.
     /// </summary>
     internal sealed class CaptureCommand : CucliCommand, ICucliDeferredCommand
     {
         public override string Name => "capture";
 
         public override string Summary =>
-            "Capture the game view, the Scene view, a render texture, or a multi-angle surround/orbit sheet to PNG files plus a manifest.";
+            "Capture the game view, the Scene view or a six-angle surround sheet to PNG, with an optional inlined image.";
 
         public override CucliActionInfo[] Actions => Declare(
             "game", "Capture what a camera renders. Add --include-ui for the overlay-composited game view image.",
-            "scene", "Capture the Scene view camera's current state.",
-            "multiview", "Frame the subject from 6 axis directions (surround) or N orbit angles, one PNG each.",
-            "render-texture", "Read an existing RenderTexture and write it out as a PNG.",
-            "info", "Report what is capturable: cameras, open Scene views, loaded render textures, output folder.",
-            "list", "List previous capture folders with their frame counts and manifests.");
+            "scene-view", "Render the Scene view camera on demand and restore its render target afterwards.",
+            "multiview", "Frame the subject from six axis directions (surround), one PNG per angle.",
+            "list", "List the images this session produced, plus capture folders under Assets/Docs~.");
 
         public override bool RequiresEditor => true;
 
         public override CucliMode RequiredMode => CucliMode.Any;
 
         /// <summary>
-        /// Captures only write PNGs and manifests under the ignored <c>Assets/Docs~</c> tree; they never
-        /// import an asset or edit a scene, so they are not a project mutation in the sense the flag means.
+        /// Captures write PNGs and manifests under the ignored <c>Assets/Docs~</c> tree; they never import
+        /// an asset or edit a scene, so they are not a project mutation in the sense the flag means.
         /// </summary>
         public override bool MutatesProject => false;
 
@@ -51,125 +49,167 @@ namespace CustomUnityCli.Editor
   ""type"": ""object"",
   ""additionalProperties"": false,
   ""properties"": {
-    ""action"": {
-      ""type"": ""string"",
-      ""enum"": [""game"", ""scene"", ""multiview"", ""render-texture"", ""info"", ""list""],
-      ""default"": ""game""
-    },
-    ""outputFolder"": { ""type"": ""string"", ""description"": ""Project-relative folder under Assets/. Default Assets/Docs~/cucli-captures."" },
-    ""fileName"": { ""type"": ""string"", ""description"": ""Bare file name for a single capture; no path.""" },
-    ""prefix"": { ""type"": ""string"", ""description"": ""File name prefix when no fileName is given."" },
-    ""force"": { ""type"": ""boolean"", ""default"": false, ""description"": ""Overwrite an existing file instead of disambiguating the name."" },
+    ""action"": { ""type"": ""string"", ""enum"": [""game"", ""scene-view"", ""multiview"", ""list""], ""default"": ""game"" },
+    ""outputFolder"": { ""type"": ""string"", ""description"": ""Project-relative folder under Assets/. Default Assets/Docs~."" },
+    ""filename"": { ""type"": ""string"", ""description"": ""Bare file name for a single capture; must not contain a path."" },
+    ""prefix"": { ""type"": ""string"", ""description"": ""File name prefix when no filename is given."" },
+    ""force"": { ""type"": ""boolean"", ""default"": false, ""description"": ""Overwrite an existing file instead of failing with ASSET_EXISTS."" },
     ""target"": { ""type"": ""string"", ""description"": ""Camera name or instance id. Defaults to Camera.main, then the first enabled non-Scene-view camera."" },
-    ""width"": { ""type"": ""integer"", ""minimum"": 1, ""maximum"": 8192, ""description"": ""Render width. Defaults to the camera's pixelWidth."" },
+    ""width"": { ""type"": ""integer"", ""minimum"": 1, ""maximum"": 8192 },
     ""height"": { ""type"": ""integer"", ""minimum"": 1, ""maximum"": 8192 },
-    ""superSize"": { ""type"": ""integer"", ""minimum"": 1, ""maximum"": 8, ""default"": 1 },
-    ""includeUI"": { ""type"": ""boolean"", ""default"": false, ""description"": ""game: composite the overlay UI too. Requires Play Mode and waits for end of frame."" },
+    ""superSize"": { ""type"": ""integer"", ""minimum"": 1, ""maximum"": 4, ""default"": 1 },
+    ""includeUI"": {
+      ""type"": ""boolean"", ""default"": false,
+      ""description"": ""game: composite the overlay UI too. Requires Play Mode and waits for the end of a frame.""
+    },
     ""includeImage"": { ""type"": ""boolean"", ""default"": false, ""description"": ""Inline a base64 PNG in the response."" },
-    ""maxResolution"": { ""type"": ""integer"", ""default"": 640, ""description"": ""Cap for an inlined image.""" },
-    ""batch"": { ""type"": ""string"", ""enum"": [""surround"", ""orbit""], ""default"": ""surround"" },
-    ""views"": { ""type"": ""integer"", ""minimum"": 1, ""maximum"": 64, ""default"": 8, ""description"": ""multiview orbit: views per elevation ring."" },
-    ""elevations"": { ""type"": ""array"", ""items"": { ""type"": ""number"" }, ""description"": ""multiview orbit: elevation angles in degrees."" },
+    ""maxResolution"": { ""type"": ""integer"", ""minimum"": 16, ""maximum"": 4096, ""default"": 640, ""description"": ""Cap applied before an image is inlined."" },
+    ""batch"": { ""type"": ""string"", ""enum"": [""surround"", ""orbit""], ""default"": ""surround"", ""description"": ""multiview: orbit is not implemented and reports so."" },
+    ""targetObject"": { ""type"": ""string"", ""description"": ""multiview: object whose bounds frame the shots. Defaults to all enabled renderers."" },
     ""distance"": { ""type"": ""number"", ""default"": 2.2, ""description"": ""multiview: camera distance as a multiple of the subject radius."" },
-    ""targetObject"": { ""type"": ""string"", ""description"": ""multiview: object whose bounds frame the shots."" },
-    ""texture"": { ""type"": ""string"", ""description"": ""render-texture: RenderTexture asset path, or its loaded name."" },
-    ""limit"": { ""type"": ""integer"", ""maximum"": 500, ""default"": 50 },
-    ""cursor"": { ""type"": ""string"" },
-    ""pageSize"": { ""type"": ""integer"", ""maximum"": 500, ""default"": 100 }
+    ""resolution"": { ""type"": ""integer"", ""minimum"": 64, ""maximum"": 4096, ""default"": 512, ""description"": ""multiview: square resolution per angle."" },
+    ""limit"": { ""type"": ""integer"", ""minimum"": 1, ""maximum"": 500, ""default"": 50 }
   }
 }";
 
         public override CucliCommandResult Execute(CucliCommandContext context)
         {
-            string action = ResolveAction(context, "game");
-            switch (action)
+            switch (ResolveAction(context, "game"))
             {
-                case "game": return Game(context);
-                case "scene": return SceneCapture(context);
                 case "multiview": return Multiview(context);
-                case "render-texture": return RenderTextureCapture(context);
-                case "info": return Info(context);
-                case "list": return List(context);
-                default: return CucliCommandResult.Unsupported(action, ActionNames());
+                case "list": return ListCaptures(context);
+                case "game":
+                case "scene-view":
+                    return CucliCommandResult.Fail(
+                        CucliErrors.CommandFailed,
+                        "capture '" + ResolveAction(context, "game")
+                        + "' needs an Editor frame and must be dispatched through the deferred path.");
+                default: return CucliCommandResult.Unsupported(ResolveAction(context, "game"), ActionNames());
             }
         }
 
-        /// <summary>
-        /// Only the overlay-composited game capture needs the end of a frame. Everything else renders
-        /// immediately through <c>Camera.Render</c>, which keeps it working while paused or in Edit Mode.
-        /// </summary>
         public void ExecuteDeferred(CucliCommandContext context, Action<CucliCommandResult> complete)
         {
-            string action = ResolveAction(context, "game");
-            if (action != "game" || !context.Input.GetBool("includeUI", false))
+            switch (ResolveAction(context, "game"))
             {
-                complete(Execute(context));
-                return;
+                case "game":
+                    Game(context, complete);
+                    return;
+                case "scene-view":
+                    SceneViewCapture(context, complete);
+                    return;
+                default:
+                    complete(Execute(context));
+                    return;
             }
-
-            if (!EditorApplication.isPlaying)
-            {
-                complete(CucliCommandResult.Fail(
-                    CucliErrors.WrongMode,
-                    "--include-ui reads the composited game view, which only exists in Play Mode. "
-                    + "Start it with 'cucli editor play', or drop --include-ui to capture a camera render "
-                    + "(which excludes Screen Space Overlay UI)."));
-                return;
-            }
-
-            GameWithOverlay(context, complete);
         }
 
         // ------------------------------------------------------------------ game
 
-        private static CucliCommandResult Game(CucliCommandContext context)
+        private static void Game(CucliCommandContext context, Action<CucliCommandResult> complete)
         {
             CucliArgs args = context.Input;
-            string folderRelative;
-            string folderAbsolute;
-            string error;
-            if (!CaptureSupport.TryResolveFolder(args, out folderRelative, out folderAbsolute, out error))
+
+            if (args.GetBool("includeUI", false))
             {
-                return CucliCommandResult.Fail(CucliErrors.InvalidParameter, error);
+                GameWithOverlay(context, complete);
+                return;
             }
 
             Camera camera;
-            if (!CaptureSupport.TryResolveCamera(args, out camera, out error))
+            string error;
+            if (!TryResolveDefaultCamera(args, out camera, out error))
             {
-                return CucliCommandResult.Fail(CucliErrors.TargetNotFound, error);
+                complete(CucliCommandResult.Fail(CucliErrors.TargetNotFound, error));
+                return;
             }
 
-            int superSize = Mathf.Clamp(args.GetInt("superSize", 1), 1, 8);
+            int superSize = Mathf.Clamp(args.GetInt("superSize", args.GetInt("super_size", 1)), 1, 4);
             int width = Mathf.Clamp(args.GetInt("width", camera.pixelWidth > 0 ? camera.pixelWidth : 1280), 1, 8192) * superSize;
             int height = Mathf.Clamp(args.GetInt("height", camera.pixelHeight > 0 ? camera.pixelHeight : 720), 1, 8192) * superSize;
 
-            return RenderCameraToFile(context, camera, width, height, folderAbsolute, folderRelative, "game", false, null);
-        }
-
-        /// <summary>
-        /// Deferred overlay capture. <c>ScreenCapture.CaptureScreenshotIntoRenderTexture</c> only has
-        /// valid contents at the end of a frame, so the work happens on the next Editor update tick.
-        /// </summary>
-        private static void GameWithOverlay(CucliCommandContext context, Action<CucliCommandResult> complete)
-        {
-            CucliArgs args = context.Input;
             string folderRelative;
             string folderAbsolute;
-            string error;
-            if (!CaptureSupport.TryResolveFolder(args, out folderRelative, out folderAbsolute, out error))
+            if (!CaptureSupport.TryResolveOutputFolder(
+                    args, CaptureSupport.DefaultCaptureFolder, out folderRelative, out folderAbsolute, out error))
             {
                 complete(CucliCommandResult.Fail(CucliErrors.InvalidParameter, error));
                 return;
             }
 
-            int superSize = Mathf.Clamp(args.GetInt("superSize", 1), 1, 8);
-            int width = Mathf.Max(1, (args.GetInt("width", Screen.width) > 0 ? args.GetInt("width", Screen.width) : 1280)) * superSize;
-            int height = Mathf.Max(1, (args.GetInt("height", Screen.height) > 0 ? args.GetInt("height", Screen.height) : 720)) * superSize;
+            string absolutePath;
+            string relativePath;
+            CucliCommandResult failure;
+            if (!TryResolveTargetFile(
+                    args, folderAbsolute, "game", ".png", out absolutePath, out relativePath, out failure))
+            {
+                complete(failure);
+                return;
+            }
 
-            RenderTexture target = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
+            if (!CaptureSupport.TryRenderCameraToPng(camera, width, height, absolutePath, out error))
+            {
+                complete(CucliCommandResult.Fail(CucliErrors.CommandFailed, error));
+                return;
+            }
+
+            SessionImageIndex.Append(absolutePath, "capture.game");
+            context.AddArtifact(absolutePath);
+            complete(BuildSingleResult(context, absolutePath, relativePath, folderRelative, camera, false));
+        }
+
+        /// <summary>
+        /// The composited game view. <c>ScreenCapture</c> only has valid contents at the end of a frame,
+        /// so this waits for a couple of Editor ticks rather than reading a half-filled buffer.
+        /// </summary>
+        private static void GameWithOverlay(CucliCommandContext context, Action<CucliCommandResult> complete)
+        {
+            CucliArgs args = context.Input;
+
+            if (!EditorApplication.isPlaying)
+            {
+                complete(CucliCommandResult.Fail(
+                    CucliErrors.WrongMode,
+                    "--include-ui reads the composited game view, which only exists in Play Mode. Start it with "
+                    + "'cucli editor play', or drop --include-ui to capture a camera render instead - note that a "
+                    + "camera render excludes Screen Space Overlay UI."));
+                return;
+            }
+
+            string error;
+            string folderRelative;
+            string folderAbsolute;
+            if (!CaptureSupport.TryResolveOutputFolder(
+                    args, CaptureSupport.DefaultCaptureFolder, out folderRelative, out folderAbsolute, out error))
+            {
+                complete(CucliCommandResult.Fail(CucliErrors.InvalidParameter, error));
+                return;
+            }
+
+            string absolutePath;
+            string relativePath;
+            CucliCommandResult failure;
+            if (!TryResolveTargetFile(
+                    args, folderAbsolute, "game-ui", ".png", out absolutePath, out relativePath, out failure))
+            {
+                complete(failure);
+                return;
+            }
+
+            int superSize = Mathf.Clamp(args.GetInt("superSize", args.GetInt("super_size", 1)), 1, 4);
+            int sourceWidth = args.GetInt("width", Screen.width);
+            int sourceHeight = args.GetInt("height", Screen.height);
+            if (sourceWidth <= 0) sourceWidth = 1280;
+            if (sourceHeight <= 0) sourceHeight = 720;
+
+            RenderTexture target = RenderTexture.GetTemporary(
+                Mathf.Clamp(sourceWidth * superSize, 1, 8192),
+                Mathf.Clamp(sourceHeight * superSize, 1, 8192),
+                24,
+                RenderTextureFormat.ARGB32);
+
             bool done = false;
             int ticks = 0;
-
             EditorApplication.CallbackFunction tick = null;
             tick = () =>
             {
@@ -185,7 +225,7 @@ namespace CustomUnityCli.Editor
                     return;
                 }
 
-                // One tick to let the game view repaint into the capture path, then read it.
+                // Tick one lets the game view repaint through the capture path; tick two reads it.
                 if (ticks < 2) return;
 
                 done = true;
@@ -196,6 +236,11 @@ namespace CustomUnityCli.Editor
                 {
                     ScreenCapture.CaptureScreenshotIntoRenderTexture(target);
                     texture = CaptureSupport.ReadRenderTexture(target);
+                    if (!CaptureSupport.TryWritePng(texture, absolutePath, out error))
+                    {
+                        complete(CucliCommandResult.Fail(CucliErrors.CommandFailed, error));
+                        return;
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -206,86 +251,94 @@ namespace CustomUnityCli.Editor
                 }
                 finally
                 {
+                    CaptureSupport.Destroy(texture);
                     RenderTexture.ReleaseTemporary(target);
                 }
 
-                CucliCommandResult result = WriteTexture(
-                    context, texture, folderAbsolute, folderRelative, "game-ui", true);
-                CaptureSupport.Destroy(texture);
-                complete(result);
+                SessionImageIndex.Append(absolutePath, "capture.game.overlay");
+                context.AddArtifact(absolutePath);
+                complete(BuildSingleResult(context, absolutePath, relativePath, folderRelative, null, true));
             };
 
             EditorApplication.update += tick;
         }
 
-        // ------------------------------------------------------------------ scene
+        // ------------------------------------------------------------------ scene view
 
-        private static CucliCommandResult SceneCapture(CucliCommandContext context)
+        private static void SceneViewCapture(CucliCommandContext context, Action<CucliCommandResult> complete)
         {
             CucliArgs args = context.Input;
-            string folderRelative;
-            string folderAbsolute;
-            string error;
-            if (!CaptureSupport.TryResolveFolder(args, out folderRelative, out folderAbsolute, out error))
+
+            if (Application.isBatchMode)
             {
-                return CucliCommandResult.Fail(CucliErrors.InvalidParameter, error);
+                complete(CucliCommandResult.Fail(
+                    CucliErrors.WrongMode,
+                    "The Scene view does not exist in batch mode, so 'capture scene-view' cannot run. "
+                    + "Use 'capture game' there.",
+                    new { batchMode = true }));
+                return;
             }
 
             SceneView view = SceneView.lastActiveSceneView;
             if (view == null)
             {
-                var open = OpenSceneViews();
+                var open = CaptureSupport.OpenSceneViews();
                 if (open.Count > 0) view = open[0];
             }
 
             if (view == null)
             {
-                return CucliCommandResult.Fail(
+                complete(CucliCommandResult.Fail(
                     CucliErrors.TargetNotFound,
                     "No Scene view is open. Open one with Window > General > Scene, or capture the game view instead.",
-                    new { sceneViewAvailable = false });
+                    new { sceneViewAvailable = false }));
+                return;
             }
 
-            // The Scene view camera needs a repaint to be current; rendering a stale state would make
-            // the file look plausible while showing last week's framing.
-            view.Repaint();
-
-            Camera camera = view.camera;
-            int superSize = Mathf.Clamp(args.GetInt("superSize", 1), 1, 8);
-            int width = Mathf.Clamp(
-                args.GetInt("width", camera != null && camera.pixelWidth > 0 ? camera.pixelWidth : 1280), 1, 8192) * superSize;
-            int height = Mathf.Clamp(
-                args.GetInt("height", camera != null && camera.pixelHeight > 0 ? camera.pixelHeight : 720), 1, 8192) * superSize;
-
-            if (camera == null)
+            if (view.camera == null)
             {
-                return CucliCommandResult.Fail(
+                complete(CucliCommandResult.Fail(
                     CucliErrors.CommandFailed,
-                    "The Scene view has no camera yet. Wait a frame and retry, or repaint the view.",
-                    new { sceneViewAvailable = true });
+                    "The Scene view has no camera yet; wait a frame and retry.",
+                    new { sceneViewAvailable = true }));
+                return;
             }
 
-            return RenderCameraToFile(context, camera, width, height, folderAbsolute, folderRelative, "scene", false, null);
-        }
-
-        internal static List<SceneView> OpenSceneViews()
-        {
-            var views = new List<SceneView>();
-            try
+            string error;
+            string folderRelative;
+            string folderAbsolute;
+            if (!CaptureSupport.TryResolveOutputFolder(
+                    args, CaptureSupport.DefaultCaptureFolder, out folderRelative, out folderAbsolute, out error))
             {
-                foreach (object entry in SceneView.sceneViews)
-                {
-                    var view = entry as SceneView;
-                    if (view != null) views.Add(view);
-                }
-            }
-            catch (Exception)
-            {
-                // SceneView.sceneViews is a non-generic ArrayList and is empty during shutdown; treat
-                // an enumeration failure as "no Scene views" rather than failing the command.
+                complete(CucliCommandResult.Fail(CucliErrors.InvalidParameter, error));
+                return;
             }
 
-            return views;
+            string absolutePath;
+            string relativePath;
+            CucliCommandResult failure;
+            if (!TryResolveTargetFile(
+                    args, folderAbsolute, "scene-view", ".png", out absolutePath, out relativePath, out failure))
+            {
+                complete(failure);
+                return;
+            }
+
+            int superSize = Mathf.Clamp(args.GetInt("superSize", args.GetInt("super_size", 1)), 1, 4);
+            int width = Mathf.Clamp(
+                args.GetInt("width", view.camera.pixelWidth > 0 ? view.camera.pixelWidth : 1280), 1, 8192) * superSize;
+            int height = Mathf.Clamp(
+                args.GetInt("height", view.camera.pixelHeight > 0 ? view.camera.pixelHeight : 720), 1, 8192) * superSize;
+
+            if (!CaptureSupport.TryCaptureSceneView(width, height, absolutePath, out error))
+            {
+                complete(CucliCommandResult.Fail(CucliErrors.CommandFailed, error));
+                return;
+            }
+
+            SessionImageIndex.Append(absolutePath, "capture.scene-view");
+            context.AddArtifact(absolutePath);
+            complete(BuildSingleResult(context, absolutePath, relativePath, folderRelative, view.camera, false));
         }
 
         // ------------------------------------------------------------------ multiview
@@ -293,10 +346,27 @@ namespace CustomUnityCli.Editor
         private static CucliCommandResult Multiview(CucliCommandContext context)
         {
             CucliArgs args = context.Input;
+
+            string batch = (args.GetString("batch") ?? "surround").Trim().ToLowerInvariant();
+            if (batch == "orbit")
+            {
+                return CucliCommandResult.Fail(
+                    CucliErrors.UnsupportedAction,
+                    "batch=orbit is not implemented. Only the six axis views of batch=surround are available; "
+                    + "for arbitrary angles, place a camera and use 'capture game --target <name>' instead.",
+                    new { requestedBatch = batch, implementedBatch = "surround" });
+            }
+
+            if (batch != "surround")
+            {
+                return CucliCommandResult.Invalid("batch", "'" + batch + "' is not 'surround' or 'orbit'.");
+            }
+
+            string error;
             string folderRelative;
             string folderAbsolute;
-            string error;
-            if (!CaptureSupport.TryResolveFolder(args, out folderRelative, out folderAbsolute, out error))
+            if (!CaptureSupport.TryResolveOutputFolder(
+                    args, CaptureSupport.DefaultCaptureFolder, out folderRelative, out folderAbsolute, out error))
             {
                 return CucliCommandResult.Fail(CucliErrors.InvalidParameter, error);
             }
@@ -307,60 +377,37 @@ namespace CustomUnityCli.Editor
             {
                 subject = CucliObjectResolver.ResolveGameObject(
                     new CucliArgs(new JObject { ["target"] = targetObject }), out error);
-                if (error != null)
-                {
-                    return CucliCommandResult.Fail(CucliErrors.TargetNotFound, error);
-                }
+                if (error != null) return CucliCommandResult.Fail(CucliErrors.TargetNotFound, error);
             }
 
-            Bounds bounds = CaptureSupport.ResolveBounds(args, subject);
-            string batch = (args.GetString("batch") ?? "surround").Trim().ToLowerInvariant();
-            Vector3[] directions;
-            string[] labels;
+            Bounds bounds = CaptureSupport.ResolveBounds(subject);
+            Vector3[] directions = CaptureSupport.SurroundDirections();
+            string[] labels = CaptureSupport.SurroundLabels();
 
-            if (batch == "orbit")
-            {
-                directions = CaptureSupport.OrbitDirections(
-                    args.GetInt("views", 8),
-                    args.GetStringList("elevations")
-                        .Select(part =>
-                        {
-                            float parsed;
-                            return float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed) ? parsed : 0f;
-                        })
-                        .ToArray());
-                labels = new string[directions.Length];
-                for (int index = 0; index < labels.Length; index++)
-                {
-                    labels[index] = "orbit" + index.ToString("D2", CultureInfo.InvariantCulture);
-                }
-            }
-            else if (batch == "surround")
-            {
-                directions = CaptureSupport.SurroundDirections();
-                labels = CaptureSupport.SurroundLabels();
-            }
-            else
-            {
-                return CucliCommandResult.Invalid("batch", "'" + batch + "' is not 'surround' or 'orbit'.");
-            }
-
-            int resolution = Mathf.Clamp(args.GetInt("resolution", args.GetInt("width", 512)), 1, 4096);
+            int resolution = Mathf.Clamp(args.GetInt("resolution", 512), 64, 4096);
             float distance = args.GetFloat("distance", 2.2f);
             bool force = args.GetBool("force", false);
+            string prefix = args.GetString("prefix") ?? "multiview";
+
+            if (!CaptureSupport.TryValidatePrefix(prefix, out error))
+            {
+                return CucliCommandResult.Invalid("prefix", error);
+            }
 
             var manifest = new JObject
             {
-                ["action"] = "multiview",
-                ["batch"] = batch,
+                ["action"] = "capture.multiview",
+                ["batch"] = "surround",
+                ["folder"] = folderRelative,
                 ["subjectBounds"] = CucliDescribe.Value(bounds, null, 0),
                 ["resolution"] = resolution,
                 ["distanceMultiplier"] = distance,
                 ["pipeline"] = CaptureSupport.PipelineJson(),
-                ["time"] = CaptureSupport.TimeJson()
+                ["startedAtUtc"] = DateTime.UtcNow.ToString("O")
             };
 
             var captures = new JArray();
+            var files = new JArray();
             int written = 0;
             int failures = 0;
 
@@ -368,108 +415,85 @@ namespace CustomUnityCli.Editor
             {
                 context.ThrowIfCancelled();
 
-                Camera camera = null;
-                RenderTexture target = null;
-                Texture2D texture = null;
-                string cameraError;
-                var entry = new JObject { ["index"] = index, ["label"] = labels[index] };
+                string absolutePath;
+                string relativePath;
+                if (!CaptureSupport.TryResolveFilePath(
+                        folderAbsolute, prefix, labels[index], ".png", 0, force,
+                        out absolutePath, out relativePath, out error))
+                {
+                    failures++;
+                    captures.Add(new JObject { ["label"] = labels[index], ["error"] = error });
+                    continue;
+                }
 
+                var entry = new JObject
+                {
+                    ["label"] = labels[index],
+                    ["direction"] = CucliDescribe.Value(directions[index], null, 0)
+                };
+
+                Camera camera = null;
                 try
                 {
                     if (!CaptureSupport.TryCreateFramingCamera(
-                            bounds, directions[index], distance, resolution, out camera, out cameraError))
+                            labels[index], bounds, directions[index], distance, out camera, out error))
                     {
-                        entry["error"] = cameraError;
                         failures++;
+                        entry["error"] = error;
                         captures.Add(entry);
                         continue;
                     }
 
-                    target = RenderTexture.GetTemporary(resolution, resolution, 24, RenderTextureFormat.ARGB32);
-                    if (!CaptureSupport.TryRenderCamera(camera, target, out cameraError))
+                    if (!CaptureSupport.TryRenderCameraToPng(camera, resolution, resolution, absolutePath, out error))
                     {
-                        entry["error"] = cameraError;
                         failures++;
-                        captures.Add(entry);
-                        continue;
-                    }
-
-                    texture = CaptureSupport.ReadRenderTexture(target);
-
-                    string absolutePath;
-                    string fileName;
-                    string nameError;
-                    if (!CaptureSupport.TryResolveFileName(
-                            new CucliArgs(new JObject
-                            {
-                                ["prefix"] = args.GetString("prefix") ?? "multiview",
-                                ["force"] = force
-                            }),
-                            folderAbsolute, "multiview", ".png", index, out absolutePath, out fileName, out nameError))
-                    {
-                        entry["error"] = nameError;
-                        failures++;
-                        captures.Add(entry);
-                        continue;
-                    }
-
-                    // Name each angle after its label so a reviewer can read the sheet without the manifest.
-                    string labelled = Path.Combine(
-                        folderAbsolute,
-                        Path.GetFileNameWithoutExtension(fileName) + "-" + labels[index] + ".png");
-                    if (File.Exists(labelled) && !force)
-                    {
-                        labelled = absolutePath;
-                    }
-
-                    string writeError;
-                    if (!CaptureSupport.TryWritePng(texture, labelled, out writeError))
-                    {
-                        entry["error"] = writeError;
-                        failures++;
+                        entry["error"] = error;
                         captures.Add(entry);
                         continue;
                     }
 
                     written++;
-                    context.AddArtifact(labelled);
-                    entry["path"] = CaptureSupport.ToProjectRelative(labelled);
-                    entry["direction"] = CucliDescribe.Value(directions[index], null, 0);
-                    entry["camera"] = CaptureSupport.CameraJson(camera);
+                    entry["path"] = relativePath;
+                    entry["bytes"] = File.Exists(absolutePath) ? new FileInfo(absolutePath).Length : 0;
                     entry["frameCount"] = Time.frameCount;
-                    entry["time"] = Time.time;
-                    entry["timestampUtc"] = DateTime.UtcNow.ToString("O");
+                    entry["camera"] = CaptureSupport.CameraJson(camera);
                     captures.Add(entry);
+
+                    context.AddArtifact(absolutePath);
+                    files.Add(relativePath);
+                    SessionImageIndex.Append(absolutePath, "capture.multiview." + labels[index]);
                 }
                 catch (Exception exception)
                 {
-                    entry["error"] = exception.GetBaseException().Message;
                     failures++;
+                    entry["error"] = exception.GetBaseException().Message;
                     captures.Add(entry);
                 }
                 finally
                 {
-                    CaptureSupport.Destroy(texture);
-                    if (target != null) RenderTexture.ReleaseTemporary(target);
+                    // The framing camera is temporary by definition and must never outlive this iteration.
                     if (camera != null) CaptureSupport.Destroy(camera.gameObject);
                 }
             }
 
             manifest["captures"] = captures;
+            manifest["files"] = files;
             manifest["requested"] = directions.Length;
             manifest["written"] = written;
             manifest["failures"] = failures;
+            manifest["completedAtUtc"] = DateTime.UtcNow.ToString("O");
 
-            string manifestPath;
+            string writtenPath;
             string manifestError;
-            if (!CaptureSupport.TryWriteManifest(folderAbsolute, manifest, out manifestPath, out manifestError))
+            if (CaptureSupport.TryWriteManifest(
+                    folderAbsolute, prefix.Trim().Trim('-') + "-multiview.json", manifest, force,
+                    out writtenPath, out manifestError))
             {
-                context.Warn(manifestError);
+                context.AddArtifact(writtenPath);
             }
             else
             {
-                context.AddArtifact(manifestPath);
-                manifest["manifestPath"] = CaptureSupport.ToProjectRelative(manifestPath);
+                context.Warn(manifestError);
             }
 
             if (written == 0)
@@ -488,311 +512,169 @@ namespace CustomUnityCli.Editor
             return CucliCommandResult.Ok(new
             {
                 folder = folderRelative,
-                batch,
+                batch = "surround",
                 requested = directions.Length,
                 written,
                 failures,
-                manifestPath = CaptureSupport.ToProjectRelative(manifestPath),
-                capturedFrame = Time.frameCount,
+                files,
+                manifestPath = CaptureSupport.ToProjectRelative(writtenPath),
                 captures
             }, "已写出 " + written + " 张视角图与清单。");
         }
 
-        // ------------------------------------------------------------------ render-texture
+        // ------------------------------------------------------------------ list
 
-        private static CucliCommandResult RenderTextureCapture(CucliCommandContext context)
-        {
-            CucliArgs args = context.Input;
-            string requested = args.GetString("texture") ?? args.GetString("name");
-            if (string.IsNullOrWhiteSpace(requested))
-            {
-                return CucliCommandResult.Missing("texture", "Pass --texture with a RenderTexture asset path or loaded name.");
-            }
-
-            string folderRelative;
-            string folderAbsolute;
-            string error;
-            if (!CaptureSupport.TryResolveFolder(args, out folderRelative, out folderAbsolute, out error))
-            {
-                return CucliCommandResult.Fail(CucliErrors.InvalidParameter, error);
-            }
-
-            RenderTexture target = null;
-
-            // Prefer an explicit asset path, then a loaded texture by name. A loaded-only texture is
-            // common for anything created at runtime, so both paths matter.
-            string normalized = CucliAssets.NormalizeAssetPath(requested);
-            if (normalized != null)
-            {
-                target = CucliAssets.Load<RenderTexture>(normalized);
-            }
-
-            if (target == null)
-            {
-                var matches = Resources.FindObjectsOfTypeAll<RenderTexture>()
-                    .Where(texture => texture != null && string.Equals(texture.name, requested, StringComparison.Ordinal))
-                    .ToArray();
-
-                if (matches.Length > 1)
-                {
-                    return CucliCommandResult.Fail(
-                        CucliErrors.TargetAmbiguous,
-                        matches.Length + " loaded RenderTextures are named '" + requested
-                        + "'; pass the asset path instead.",
-                        new { candidates = matches.Select(texture => texture.GetInstanceID()).ToArray() });
-                }
-
-                if (matches.Length == 1) target = matches[0];
-            }
-
-            if (target == null)
-            {
-                return CucliCommandResult.Fail(
-                    CucliErrors.AssetNotFound,
-                    "No RenderTexture asset or loaded RenderTexture matches '" + requested + "'.");
-            }
-
-            if (!target.IsCreated())
-            {
-                return CucliCommandResult.Fail(
-                    CucliErrors.CommandFailed,
-                    "'" + requested + "' exists but has not been created yet, so it holds no pixels. "
-                    + "It is usually filled by a camera render or a Blit; capture after that has run.",
-                    new { texture = requested, width = target.width, height = target.height });
-            }
-
-            Texture2D texture = CaptureSupport.ReadRenderTexture(target);
-            CucliCommandResult result = WriteTexture(
-                context, texture, folderAbsolute, folderRelative, "rt-" + Sanitize(target.name), false, target);
-            CaptureSupport.Destroy(texture);
-            return result;
-        }
-
-        private static string Sanitize(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value)) return "texture";
-            var builder = new System.Text.StringBuilder(value.Length);
-            foreach (char character in value)
-            {
-                builder.Append(char.IsLetterOrDigit(character) || character == '-' || character == '_' ? character : '_');
-            }
-
-            return builder.ToString();
-        }
-
-        // ------------------------------------------------------------------ info
-
-        private static CucliCommandResult Info(CucliCommandContext context)
-        {
-            CucliArgs args = context.Input;
-            string folderRelative;
-            string folderAbsolute;
-            string error;
-            if (!CaptureSupport.TryResolveFolder(args, out folderRelative, out folderAbsolute, out error))
-            {
-                return CucliCommandResult.Fail(CucliErrors.InvalidParameter, error);
-            }
-
-            var cameras = new List<JObject>();
-            foreach (Camera camera in Object.FindObjectsOfType<Camera>())
-            {
-                if (camera == null) continue;
-                var entry = CaptureSupport.CameraJson(camera);
-                entry["isMain"] = camera.CompareTag("MainCamera");
-                entry["cameraType"] = camera.cameraType.ToString();
-                entry["isActiveAndEnabled"] = camera.isActiveAndEnabled;
-                cameras.Add(entry);
-            }
-
-            var scenes = new JArray();
-            foreach (SceneView view in OpenSceneViews())
-            {
-                scenes.Add(new JObject
-                {
-                    ["title"] = view.titleContent == null ? null : view.titleContent.text,
-                    ["hasCamera"] = view.camera != null,
-                    ["position"] = new JObject
-                    {
-                        ["x"] = view.position.x,
-                        ["y"] = view.position.y,
-                        ["width"] = view.position.width,
-                        ["height"] = view.position.height
-                    },
-                    ["is2D"] = view.in2DMode
-                });
-            }
-
-            var renderTextures = new JArray();
-            foreach (RenderTexture texture in Resources.FindObjectsOfTypeAll<RenderTexture>())
-            {
-                if (texture == null) continue;
-                renderTextures.Add(new JObject
-                {
-                    ["name"] = texture.name,
-                    ["instanceId"] = texture.GetInstanceID(),
-                    ["width"] = texture.width,
-                    ["height"] = texture.height,
-                    ["isCreated"] = texture.IsCreated(),
-                    ["assetPath"] = string.IsNullOrEmpty(CucliAssets.GetAssetPath(texture))
-                        ? null
-                        : CucliAssets.GetAssetPath(texture)
-                });
-                if (renderTextures.Count >= CucliPaging.MaxPageSize) break;
-            }
-
-            var cameraPage = CucliPaging.Slice(cameras, args, 100);
-            var cameraArray = new JArray();
-            foreach (JObject entry in cameraPage.Items) cameraArray.Add(entry);
-
-            return CucliCommandResult.Ok(new
-            {
-                outputFolder = folderRelative,
-                pipeline = CaptureSupport.PipelineJson(),
-                time = CaptureSupport.TimeJson(),
-                screen = new { width = Screen.width, height = Screen.height, dpi = Screen.dpi },
-                overlayUiAvailability = EditorApplication.isPlaying
-                    ? "Play Mode is active, so 'capture game --include-ui' can read the composited game view."
-                    : "Edit Mode: --include-ui is unavailable, so 'capture game' returns a camera render without Screen Space Overlay UI.",
-                cameras = CucliPaging.Envelope(cameraPage, cameraArray, new JObject
-                {
-                    ["sceneViews"] = scenes,
-                    ["loadedRenderTextures"] = renderTextures,
-                    ["renderTextureCount"] = renderTextures.Count
-                })
-            });
-        }
-
-        private static CucliCommandResult List(CucliCommandContext context)
+        private static CucliCommandResult ListCaptures(CucliCommandContext context)
         {
             CucliArgs args = context.Input;
             int limit = Mathf.Clamp(args.GetInt("limit", 50), 1, 500);
 
+            JArray sessionImages = SessionImageIndex.ReadExisting(limit);
+
             var folders = new JArray();
             foreach (string folder in CaptureSupport.ListCaptureFolders(limit))
             {
-                string manifestPath = Path.Combine(folder, CaptureSupport.ManifestName);
-                var entry = new JObject
+                folders.Add(new JObject
                 {
-                    ["folder"] = CaptureSupport.ToProjectRelative(folder),
+                    ["folder"] = CaptureSupport.ToProjectRelative(folder).Replace('\\', '/'),
                     ["pngCount"] = CaptureSupport.CountPngs(folder),
-                    ["lastWriteUtc"] = Directory.GetLastWriteTimeUtc(folder).ToString("O"),
-                    ["hasManifest"] = File.Exists(manifestPath)
-                };
-
-                if (File.Exists(manifestPath))
-                {
-                    try
-                    {
-                        JObject manifest = CucliJson.ParseObject(File.ReadAllText(manifestPath, CucliJson.Utf8NoBom));
-                        entry["action"] = manifest["action"];
-                        entry["written"] = manifest["written"];
-                        entry["failures"] = manifest["failures"];
-                        entry["writtenAtUtc"] = manifest["writtenAtUtc"];
-                    }
-                    catch (Newtonsoft.Json.JsonException exception)
-                    {
-                        entry["manifestError"] = exception.Message;
-                    }
-                }
-
-                folders.Add(entry);
+                    ["lastWriteUtc"] = Directory.GetLastWriteTimeUtc(folder).ToString("O")
+                });
             }
 
             return CucliCommandResult.Ok(new
             {
-                root = CaptureSupport.DefaultFolder,
+                sessionImages,
+                sessionImageCount = sessionImages.Count,
+                sessionIndexPath = CaptureSupport.ToProjectRelative(SessionImageIndex.Path),
+                folders,
                 folderCount = folders.Count,
-                folders
+                note = "sessionImages lists what this Editor session wrote and still exists on disk; the index lives "
+                    + "under Library/CustomUnityCli so it survives a domain reload. folders lists every run folder "
+                    + "under " + CaptureSupport.DefaultCaptureFolder + "."
             });
         }
 
-        // ------------------------------------------------------------------ shared write path
+        // ------------------------------------------------------------------ shared
 
-        private static CucliCommandResult RenderCameraToFile(
-            CucliCommandContext context,
-            Camera camera,
-            int width,
-            int height,
-            string folderAbsolute,
-            string folderRelative,
-            string prefix,
-            bool includesOverlayUI,
-            RenderTexture existing)
+        /// <summary>
+        /// Resolves the camera a <c>game</c> capture should use: an explicit target wins, then
+        /// <c>Camera.main</c>, then the first enabled camera that is neither a Scene view nor a preview.
+        /// </summary>
+        private static bool TryResolveDefaultCamera(CucliArgs args, out Camera camera, out string error)
         {
-            RenderTexture target = null;
-            Texture2D texture = null;
-            try
-            {
-                target = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
-                string renderError;
-                if (!CaptureSupport.TryRenderCamera(camera, target, out renderError))
-                {
-                    return CucliCommandResult.Fail(CucliErrors.CommandFailed, renderError);
-                }
+            camera = null;
+            error = null;
 
-                texture = CaptureSupport.ReadRenderTexture(target);
-                return WriteTexture(context, texture, folderAbsolute, folderRelative, prefix, includesOverlayUI, camera);
-            }
-            finally
+            string identity = args.GetString("target") ?? args.GetString("camera");
+            if (!string.IsNullOrWhiteSpace(identity))
             {
-                if (target != null) RenderTexture.ReleaseTemporary(target);
-                CaptureSupport.Destroy(texture);
+                return CaptureSupport.TryResolveCamera(identity, out camera, out error);
             }
+
+            camera = Camera.main;
+            if (camera != null) return true;
+
+            foreach (Camera candidate in CaptureSupport.Cameras())
+            {
+                if (candidate == null || !candidate.isActiveAndEnabled) continue;
+                if (candidate.cameraType == CameraType.SceneView) continue;
+                if (candidate.cameraType == CameraType.Preview) continue;
+                camera = candidate;
+                return true;
+            }
+
+            error = "No enabled camera in the loaded scenes. Pass --target <name|instanceId>, or create one first. "
+                + "'cucli frame inspect' lists the cameras.";
+            return false;
         }
 
-        private static CucliCommandResult WriteTexture(
-            CucliCommandContext context,
-            Texture2D texture,
+        /// <summary>
+        /// Resolves the destination file, honouring an explicit <c>--filename</c> and otherwise building
+        /// one from the prefix. An existing file is an <c>ASSET_EXISTS</c> refusal unless <c>--force</c>.
+        ///
+        /// Failures come back as a ready-made result rather than a bare string, so the caller never has
+        /// to infer the error code from the message.
+        /// </summary>
+        private static bool TryResolveTargetFile(
+            CucliArgs args,
             string folderAbsolute,
-            string folderRelative,
-            string prefix,
-            bool includesOverlayUI,
-            Object source = null)
+            string defaultSource,
+            string extension,
+            out string absolutePath,
+            out string relativePath,
+            out CucliCommandResult failure)
         {
-            if (texture == null)
+            failure = null;
+            absolutePath = null;
+            relativePath = null;
+            bool force = args.GetBool("force", false);
+            string requested = args.GetString("filename") ?? args.GetString("fileName")
+                ?? args.GetString("file_name") ?? args.GetString("outputFile");
+
+            if (!string.IsNullOrWhiteSpace(requested))
             {
-                return CucliCommandResult.Fail(
-                    CucliErrors.CommandFailed,
-                    "No pixels were produced. The camera may be culled, disabled, or rendering to a target "
-                    + "texture that this render did not fill.");
+                requested = requested.Trim();
+                if (requested.IndexOf('/') >= 0 || requested.IndexOf('\\') >= 0)
+                {
+                    failure = CucliCommandResult.Invalid(
+                        "filename", "must be a bare file name without a path; use '--output-folder' for the folder.");
+                    return false;
+                }
+
+                string fileName = Path.HasExtension(requested) ? requested : requested + extension;
+                absolutePath = Path.Combine(folderAbsolute, fileName);
+                relativePath = CaptureSupport.ToProjectRelative(absolutePath).Replace('\\', '/');
+
+                if (File.Exists(absolutePath) && !force)
+                {
+                    failure = CucliCommandResult.Fail(
+                        CucliErrors.AssetExists,
+                        "Refusing to overwrite " + relativePath + ". Pass --force to replace it.",
+                        new { path = relativePath });
+                    return false;
+                }
+
+                return true;
             }
 
-            CucliArgs args = context.Input;
-            string absolutePath;
-            string fileName;
-            string nameError;
-            if (!CaptureSupport.TryResolveFileName(
-                    args, folderAbsolute, prefix, ".png", 0, out absolutePath, out fileName, out nameError))
+            string prefix = args.GetString("prefix");
+            string prefixError;
+            if (!CaptureSupport.TryValidatePrefix(prefix, out prefixError))
             {
-                return CucliCommandResult.Fail(CucliErrors.InvalidParameter, nameError);
+                failure = CucliCommandResult.Invalid("prefix", prefixError);
+                return false;
             }
 
-            string writeError;
-            if (!CaptureSupport.TryWritePng(texture, absolutePath, out writeError))
+            string error;
+            if (!CaptureSupport.TryResolveFilePath(
+                    folderAbsolute, prefix, defaultSource, extension, 0, force,
+                    out absolutePath, out relativePath, out error))
             {
-                return CucliCommandResult.Fail(CucliErrors.CommandFailed, writeError);
+                failure = CucliCommandResult.Fail(
+                    CucliErrors.AssetExists, error, new { path = relativePath });
+                return false;
             }
 
-            context.AddArtifact(absolutePath);
+            return true;
+        }
 
-            string inline = null;
-            if (args.GetBool("includeImage", false))
-            {
-                Texture2D small = CaptureSupport.Downscale(texture, Mathf.Clamp(args.GetInt("maxResolution", 640), 16, 4096));
-                inline = CaptureSupport.ToBase64Png(small);
-                if (!ReferenceEquals(small, texture)) CaptureSupport.Destroy(small);
-            }
-
+        private static CucliCommandResult BuildSingleResult(
+            CucliCommandContext context,
+            string absolutePath,
+            string relativePath,
+            string folderRelative,
+            Camera camera,
+            bool includesOverlayUI)
+        {
             var data = new JObject
             {
-                ["path"] = CaptureSupport.ToProjectRelative(absolutePath),
-                ["fileName"] = fileName,
+                ["path"] = relativePath,
+                ["fileName"] = Path.GetFileName(absolutePath),
                 ["folder"] = folderRelative,
-                ["width"] = texture.width,
-                ["height"] = texture.height,
-                ["bytes"] = new FileInfo(absolutePath).Length,
-                // Stated explicitly so a caller can never mistake a camera render for the composited
-                // game view: Screen Space Overlay UI is drawn by the game view, not by a camera.
+                ["bytes"] = File.Exists(absolutePath) ? new FileInfo(absolutePath).Length : 0,
+                // Stated explicitly so a camera render is never mistaken for the composited game view:
+                // Screen Space Overlay UI is drawn by the game view, not by any camera.
                 ["includesOverlayUI"] = includesOverlayUI,
                 ["capturedFrame"] = Time.frameCount,
                 ["time"] = Time.time,
@@ -800,24 +682,57 @@ namespace CustomUnityCli.Editor
                 ["pipeline"] = CaptureSupport.PipelineJson()
             };
 
-            if (source is Camera capturedCamera) data["camera"] = CaptureSupport.CameraJson(capturedCamera);
-            else if (source is RenderTexture sourceTexture)
-            {
-                data["sourceTexture"] = new JObject
-                {
-                    ["name"] = sourceTexture.name,
-                    ["width"] = sourceTexture.width,
-                    ["height"] = sourceTexture.height
-                };
-            }
+            if (camera != null) data["camera"] = CaptureSupport.CameraJson(camera);
 
-            if (inline != null) data["imageBase64"] = inline;
+            if (context.Input.GetBool("includeImage", false))
+            {
+                int maxResolution = Mathf.Clamp(context.Input.GetInt("maxResolution", 640), 16, 4096);
+                var loaded = LoadPng(absolutePath);
+                if (loaded != null)
+                {
+                    try
+                    {
+                        Texture2D small = CaptureSupport.Downscale(loaded, maxResolution);
+                        data["imageBase64"] = CaptureSupport.ToBase64Png(small);
+                        data["imageInlinedAt"] = Mathf.Max(small.width, small.height);
+                        if (!ReferenceEquals(small, loaded)) CaptureSupport.Destroy(small);
+                    }
+                    finally
+                    {
+                        CaptureSupport.Destroy(loaded);
+                    }
+                }
+                else
+                {
+                    context.Warn("Could not re-read the written PNG, so no inline image was produced.");
+                }
+            }
 
             string message = includesOverlayUI
                 ? "已截取合成后的 Game 视图。"
                 : "已截取相机渲染画面（不含 Screen Space Overlay UI）。";
 
             return CucliCommandResult.Ok(data, message);
+        }
+
+        /// <summary>
+        /// Loads the PNG that was just written so an inlined image is the actual artefact rather than a
+        /// second render, which could differ from the file on disk.
+        /// </summary>
+        private static Texture2D LoadPng(string absolutePath)
+        {
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(absolutePath);
+                var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (texture.LoadImage(bytes, false)) return texture;
+                CaptureSupport.Destroy(texture);
+                return null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
     }
 }

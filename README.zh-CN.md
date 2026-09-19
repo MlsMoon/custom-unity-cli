@@ -18,6 +18,31 @@
 
 ---
 
+## 兼容性 —— 先读这一段
+
+**本工具面向 Unity 2022 工程。** 它针对 **Unity 2022.3** 开发与验证；Editor Worker、命令面、
+文件协议全部以这一代 Editor API 为前提。
+
+> ### Unity 6 请用 Unity 官方的 CLI
+>
+> **本插件暂时不面向 Unity 6，这是范围划分，不是遗漏。**
+>
+> 如果你的工程在 Unity 6 上，请使用 **Unity CLI** —— Unity 为那一代提供的官方命令行接口。那才是
+> Unity 6 上受支持的路径：它与 Editor 同步维护，而且根本不需要一个桥接包。
+>
+> - [Unity CLI reference](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)
+> - [Meet the Unity CLI](https://unity.com/blog/meet-the-unity-cli)
+>
+> 本设计**没有考虑** Unity 6 的使用情况。文件队列传输、Domain Reload 契约与命令面都只在
+> 2022.3 上构建和测试过，不应假定它们在 Unity 6 上可用。
+>
+> 低于 2022 的版本同样如此：2021.3 LTS 未经测试。**请把 2022.3 当作受支持的目标**，
+> 其余版本一律视为不受支持。
+
+有一处容易读起来自相矛盾：少数命令实现里带了前向兼容守卫 —— 比如 `PhysicMaterial` / `PhysicsMaterial`
+的别名，以及 Unity 6 Build Profile 的反射分支。它们存在的唯一目的是：万一有人在更高版本的 Editor 里
+打开这个包，程序集仍然**能编译**。这不是支持声明，这些版本上的行为一律未经测试。
+
 ## 为什么要再做一个 Unity CLI
 
 现在做 Unity 自动化基本只有三条路：带端口、还要给客户端接线的 MCP 服务器；每个任务单独写一个
@@ -52,7 +77,8 @@ CLI 写一个作业文件；Editor Worker 在下一个 update tick 取走执行�
 
 ## 能做什么
 
-约 30 个 Editor 命令组 + 8 个离线命令组。用 `cucli commands list` 看你这份构建的确切能力面，
+**32 个 Editor 命令组、402 个 action**，另有 9 个完全不需要 Editor 的离线命令组。
+用 `cucli commands list` 看你这份构建的确切能力面，
 用 `cucli commands describe <group>` 看某一组的参数 Schema。
 
 **离线 —— Unity 关着也能用**
@@ -100,7 +126,8 @@ CLI 写一个作业文件；Editor Worker 在下一个 update tick 取走执行�
 | `package` | Package Manager 增删、嵌入、搜索、scoped registry。 |
 | `code` | 执行 C# 片段，以及一次往返批量执行多个操作。 |
 | `reflect` | 运行期查询 Unity 类型、成员与签名。 |
-| `meta` | 导出运行期目录、生成静态 registry、报告环境。 |
+| `meta` | 导出运行期目录、生成静态 registry、报告环境、脚手架项目专属命令。 |
+| `selftest` | 工具自测：内省断言、action 安全性面、示例报告。 |
 
 ## 安装
 
@@ -130,7 +157,8 @@ git clone https://github.com/igp/custom-unity-cli.git Assets/Plugins/CustomUnity
 
 ### 环境要求
 
-- Unity **2021.3** 或更新（在 2022.3 上开发与验证）。
+- **Unity 2022.3** —— 受支持且已验证的目标版本。Unity 6 暂不在范围内，请改用
+  [Unity CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)；2021.3 LTS 未经测试。
 - `com.unity.nuget.newtonsoft-json` —— 已声明为包依赖，会自动装上。
 - PowerShell 5.1 或 PowerShell 7+。**仅此而已**：不需要 .NET SDK、不需要 Node、不需要 Python、
   不需要 MCP 客户端。
@@ -199,6 +227,42 @@ git clone https://github.com/igp/custom-unity-cli.git Assets/Plugins/CustomUnity
 | `130` | 已取消 |
 
 判断结果时**同时**看进程退出码和 `success`。长操作保留 `jobId`，之后可以回查结果。
+
+## 验证与自测
+
+两个工具回答两个不同的问题，都不需要关掉你的 Editor。
+
+```powershell
+# 构建门：用 Unity 自带 Roslyn + 官方引用程序集编译 Editor 源码，几秒出结果
+Tools/verify.ps1
+Tools/verify.ps1 -WithUnity   # 额外把一个丢弃式工程导入一遍（该工程不声明任何可选包）
+
+# 行为门：黑盒自测，全程通过 CLI 驱动 CLI
+cucli selftest                          # 契约探针 + 行为流
+cucli selftest -Tier AB                 # 契约探针 + 行为流
+cucli selftest -Group object,asset -Action object/create
+```
+
+`verify.ps1` 是**构建**门。它用 Unity 自己的 Roslyn 对着 Unity 自己的引用程序集编译 Editor 源码，
+所以能在几秒内抓到真实类型错误，且不开 Editor 进程、不抢工程锁、不触发 Domain Reload。
+`-WithUnity` 会把包导入一个 manifest 里**没有任何可选包**的丢弃式工程 —— 这让「不依赖任何可选包」
+从一句承诺变成一次实测。两种模式都不会启动、聚焦或触碰正在运行的 Editor。
+
+`cucli selftest` 是**行为**门，也是「这东西到底能不能用」的答案。它什么都不伸手去拿：从在线 worker
+目录读取命令面，然后**只通过 `Tools/cucli.ps1`** 与 Editor 对话。因此一次全绿证明的是整条链路 ——
+PowerShell 解析器 → 作业文件 → Editor worker → 命令 → 结果文件 → 信封 → 退出码。
+
+| 层 | 做什么 |
+| --- | --- |
+| A | 契约探针。对每个**只读** action 无参调用一次。接线正确的命令要么给出真实载荷，要么给出参数校验错误；未知命令、分派错位或未捕获异常都算缺陷。这一层专门抓注册表漂移、Schema 缺口和模式门 bug，覆盖面是全量命令面。 |
+| B | 行为。在 `Assets/CucliSelfTest` 下建沙箱、用真实载荷跑真实流程，然后删掉沙箱。 |
+| heavy | 需显式 `-IncludeHeavy`：编译、包解析、测试运行。**永远不会**做真实出包、光照烘焙或写 manifest。 |
+
+报告落在 `Library/CustomUnityCli/selftest-report.md`；`-KeepSandbox` 会把沙箱留下来供排查。
+每个已声明的 action 都恰好归属一层，所以「全部都测过了」这句话随着命令面增长仍然成立。
+
+> 注：A 层对**只读** action 无参调用是安全的；会改变 Editor 或工程状态的 action（undo、play、
+> compile、clear 等）由各层显式声明，不会在契约探针里被误触。
 
 ## 本工具遵循的设计规则
 

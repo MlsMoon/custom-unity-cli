@@ -66,6 +66,8 @@ $Script:ExtensionCandidates = @(
     'Packages/CustomUnityCli.Extensions'
 )
 $Script:ExtensionPreferredFolder = 'Assets/CustomUnityCli.Extensions'
+# Must match CucliExtensionPaths.LocalRegistryFileName.
+$Script:ExtensionRegistryFileName = 'registry.local.json'
 
 #region ---------------------------------------------------------------- exit codes
 
@@ -150,9 +152,11 @@ function Read-JsonFile {
 }
 
 function ConvertTo-JsonSafe {
-    param($Value, [int]$Depth = 32)
+    param($Value, [int]$Depth = 32, [switch]$Compress)
     if ($null -eq $Value) { return 'null' }
-    return ($Value | ConvertTo-Json -Depth $Depth -Compress:$false)
+    # -Compress exists for --format ndjson, where the contract is one JSON object per LINE. Emitting
+    # pretty-printed multi-line JSON there breaks any line-oriented consumer (jq -c, streaming readers).
+    return ($Value | ConvertTo-Json -Depth $Depth -Compress:$Compress.IsPresent)
 }
 
 #endregion
@@ -274,7 +278,7 @@ function Get-LocalRegistry {
         while Unity is closed.
     #>
     param([string]$ProjectRoot)
-    $path = Join-Path (Get-ExtensionRoot $ProjectRoot) 'registry.local.json'
+    $path = Join-Path (Get-ExtensionRoot $ProjectRoot) $Script:ExtensionRegistryFileName
     return Read-JsonFile $path
 }
 
@@ -412,6 +416,7 @@ function Split-CucliArguments {
         Format     = $null
         Project    = $null
         Timeout    = 60
+        Action     = $null
         Detach     = $false
         Quiet      = $false
         Help       = $false
@@ -495,6 +500,20 @@ function Split-CucliArguments {
         $result.Positional.Add($token)
     }
 
+    # `action` is reserved: it is the key that selects which sub-action of a group runs, and the CLI
+    # always fills it in. A `--action` option is therefore consumed here as an alternative spelling of
+    # the positional action instead of being forwarded as a payload key - otherwise a command group
+    # that happened to declare a parameter named `action` would silently receive the CLI's value and
+    # the user's would vanish. Meta-commands that need a sub-action list use `actionNames` /
+    # `actionName` for exactly this reason.
+    if ($result.Payload.Contains('action')) {
+        if ([string]::IsNullOrWhiteSpace($result.Action)) {
+            $result.Action = ([string]$result.Payload['action']).Trim()
+        }
+
+        $result.Payload.Remove('action')
+    }
+
     return $result
 }
 
@@ -568,7 +587,8 @@ function Write-CucliResult {
             timestampUtc = [datetime]::UtcNow.ToString('O')
             data         = $envelope
         }
-        Write-Output (ConvertTo-JsonSafe $frame)
+        # One object per line, per the NDJSON contract.
+        Write-Output (ConvertTo-JsonSafe $frame -Compress)
     } elseif ($Format -eq 'json') {
         Write-Output (ConvertTo-JsonSafe $envelope)
     } else {
@@ -932,14 +952,74 @@ function Resolve-Group {
     if ($Index.Aliases.ContainsKey($key)) { $key = $Index.Aliases[$key].ToLowerInvariant() }
     if ($Index.Offline.ContainsKey($key)) { return $Index.Offline[$key] }
     if ($Index.Groups.ContainsKey($key)) { return $Index.Groups[$key] }
+
+    # Separator-insensitive fallback, mirroring Resolve-DeclaredName for actions.
+    $probe = ($key -replace '[-_]', '')
+    foreach ($table in @($Index.Offline, $Index.Groups)) {
+        $hits = @($table.Keys | Where-Object { ($_ -replace '[-_]', '') -eq $probe })
+        if ($hits.Count -eq 1) { return $table[$hits[0]] }
+    }
+
+    return $null
+}
+
+function Resolve-DeclaredName {
+    <#
+        Maps a token the user typed onto the exact spelling a command declares.
+
+        Command actions are declared in C# and mostly use underscores (`get_hierarchy`), while a
+        person at a shell reaches for hyphens (`get-hierarchy`). Rather than force one convention on
+        everybody, accept either: match exactly first, then compare with '-' and '_' stripped. An
+        ambiguous match returns nothing so the caller can list the real options instead of guessing.
+    #>
+    param([string[]]$Declared, [string]$Typed)
+
+    if ([string]::IsNullOrWhiteSpace($Typed) -or $null -eq $Declared) { return $null }
+
+    $token = $Typed.Trim()
+    foreach ($candidate in $Declared) {
+        if ($candidate -ieq $token) { return $candidate }
+    }
+
+    $key = ($token -replace '[-_]', '').ToLowerInvariant()
+    $hits = @($Declared | Where-Object { ($_ -replace '[-_]', '').ToLowerInvariant() -eq $key })
+    if ($hits.Count -eq 1) { return $hits[0] }
     return $null
 }
 
 function Get-GroupActions {
     param($Group)
     if ($null -eq $Group) { return @() }
-    if ($Group.actions) { return @($Group.actions | ForEach-Object { $_.name }) }
+    if ($Group.actions) { return @($Group.actions | ForEach-Object { if ($_ -is [string]) { $_ } else { $_.name } }) }
     return @()
+}
+
+function Get-GroupActionObjects {
+    <#
+        Full action declarations, as { name, summary }.
+
+        The runtime catalog publishes both, and `commands list` must not flatten them to bare names:
+        a summary is the tool's self-description, so dropping it makes the catalog useless for
+        discovering what an action does. A plain string array is still accepted, because a
+        hand-written `extensions.json` or an older static registry may contain one.
+    #>
+    param($Group)
+    if ($null -eq $Group -or -not $Group.actions) { return @() }
+
+    $result = New-Object System.Collections.Generic.List[object]
+    foreach ($action in @($Group.actions)) {
+        if ($null -eq $action) { continue }
+        if ($action -is [string]) {
+            $result.Add([ordered]@{ name = $action; summary = $null })
+            continue
+        }
+
+        $name = $action.name
+        if ([string]::IsNullOrWhiteSpace($name)) { continue }
+        $result.Add([ordered]@{ name = $name; summary = $action.summary })
+    }
+
+    return $result.ToArray()
 }
 
 function Test-ControlAction {
@@ -983,10 +1063,28 @@ function Invoke-HostStatus {
         worker = [ordered]@{
             online        = $online
             heartbeatAgeSeconds = if ($null -eq $age) { $null } else { [math]::Round($age, 2) }
+            # Liveness and state age are reported separately on purpose. The heartbeat timestamp is
+            # refreshed by a background timer in the Editor, so it stays current even while Unity is
+            # unfocused or importing; the Unity state fields are only re-sampled when the Editor's own
+            # update loop runs. A fresh heartbeat with an old state sample means "alive but busy",
+            # which is exactly what a caller needs to distinguish from "gone".
+            stateSampledAtUtc = if ($heartbeat) { $heartbeat.stateSampledAtUtc } else { $null }
+            stateAgeSeconds = if ($heartbeat -and $heartbeat.stateSampledAtUtc) {
+                try {
+                    $sampled = [datetime]::Parse(
+                        $heartbeat.stateSampledAtUtc,
+                        [System.Globalization.CultureInfo]::InvariantCulture,
+                        [System.Globalization.DateTimeStyles]::AdjustToUniversal -bor [System.Globalization.DateTimeStyles]::AssumeUniversal)
+                    [math]::Round(([datetime]::UtcNow - $sampled).TotalSeconds, 2)
+                } catch { $null }
+            } else { $null }
             sessionId     = if ($heartbeat) { $heartbeat.sessionId } else { $null }
             workerVersion = if ($heartbeat) { $heartbeat.workerVersion } else { $null }
+            protocolVersion = if ($heartbeat) { $heartbeat.protocolVersion } else { $null }
             unityVersion  = if ($heartbeat) { $heartbeat.unityVersion } else { $null }
+            processId     = if ($heartbeat) { $heartbeat.processId } else { $null }
             isPlaying     = if ($heartbeat) { $heartbeat.isPlaying } else { $false }
+            isPaused      = if ($heartbeat) { $heartbeat.isPaused } else { $false }
             isCompiling   = if ($heartbeat) { $heartbeat.isCompiling } else { $false }
             isUpdating    = if ($heartbeat) { $heartbeat.isUpdating } else { $false }
             hasCompilationErrors = if ($heartbeat) { $heartbeat.hasCompilationErrors } else { $false }
@@ -1080,7 +1178,14 @@ function Read-TailLines {
 
 function Invoke-HostDoctor {
     param([string]$ProjectRoot, $Arguments, [string]$Format)
+
+    # Both spellings are accepted because the shipped registry declares 'deep' as an ACTION, so a
+    # caller who follows `cucli commands describe doctor` will write `cucli doctor deep`. Silently
+    # running the shallow check in that case would make a diagnostic tool quietly do less than asked.
     $deep = [bool]($Arguments.Payload['deep'])
+    if (-not $deep -and $Arguments.Positional.Count -gt 1) {
+        $deep = ([string]$Arguments.Positional[1]).ToLowerInvariant() -eq 'deep'
+    }
 
     $checks = New-Object System.Collections.Generic.List[object]
     # A hashtable is a reference type, so the scriptblock below can accumulate into it.
@@ -1096,6 +1201,28 @@ function Invoke-HostDoctor {
 
     $version = Get-ProjectVersion $ProjectRoot
     & $addCheck 'project.version' ($null -ne $version) "ProjectSettings/ProjectVersion.txt declares Unity $version."
+
+    # Scope boundary, stated where a user actually meets it.
+    #
+    # The README says this tool targets Unity 2022 and that Unity 6 should use Unity's own CLI. A
+    # README is not a support policy, so the same verdict is reported here: a Unity 6 project is told
+    # to switch tools before it burns time on a bridge package that was never built for it.
+    $majorVersion = 0
+    if ($version -and $version -match '^(\d+)\.') { $majorVersion = [int]$Matches[1] }
+
+    if ($majorVersion -ge 6000) {
+        & $addCheck 'unity.versionSupported' $false `
+            ("Unity $version is out of scope. This tool targets Unity 2022 (verified on 2022.3) and its " +
+             "design has not considered Unity 6 at all. On Unity 6 use Unity CLI, the official " +
+             "command-line interface for that generation: " +
+             "https://docs.unity.com/en-us/unity-cli/unity-cli-reference")
+    } elseif ($majorVersion -eq 2022) {
+        & $addCheck 'unity.versionSupported' $true "Unity $version is the supported and verified target."
+    } elseif ($majorVersion -gt 0) {
+        & $addCheck 'unity.versionSupported' $true `
+            ("Unity $version is outside the tested range (2022.3). Nothing here has been verified on it; " +
+             "treat 2022.3 as the supported target.") 'warning'
+    }
 
     $packageJson = Join-Path (Get-PackageRoot) 'package.json'
     $package = Read-JsonFile $packageJson
@@ -1207,19 +1334,20 @@ function Invoke-HostDoctor {
         if ($null -eq $porcelain) {
             & $addCheck 'package.checkout' $true `
                 'The package is a git checkout but git could not be queried; skipped.' 'warning'
+        } elseif (-not $hasHead) {
+            # Before the first commit every file in the tree is only staged or modified relative to
+            # nothing, so nothing can have been published yet. Calling each of them a "modification"
+            # is pure noise, and noise is how a real warning gets ignored.
+            & $addCheck 'package.checkout' $true `
+                'The package git checkout has no commits yet; nothing could be published upstream.' 'warning'
         } else {
             $entries = @($porcelain | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-            $dirty = if ($hasHead) { @($entries) } else { @($entries | Where-Object { $_ -notmatch '^A' }) }
 
-            & $addCheck 'package.checkout' ($dirty.Count -eq 0) `
-                $(if ($dirty.Count -eq 0) {
-                    if ($hasHead) {
-                        'The package git checkout is clean: nothing local would be published upstream.'
-                    } else {
-                        'The package git checkout has no commits yet; nothing could be published upstream.'
-                    }
+            & $addCheck 'package.checkout' ($entries.Count -eq 0) `
+                $(if ($entries.Count -eq 0) {
+                    'The package git checkout is clean: nothing local would be published upstream.'
                 } else {
-                    "$($dirty.Count) local modification(s) inside the package checkout. Move project-specific work to the extension area or upstream it deliberately. First: $($dirty[0].Trim())"
+                    "$($entries.Count) local modification(s) inside the package checkout. Move project-specific work to the extension area or upstream it deliberately. First: $($entries[0].Trim())"
                 }) 'warning'
         }
     }
@@ -1263,27 +1391,33 @@ function Invoke-HostCommands {
             $groups = New-Object System.Collections.Generic.List[object]
             foreach ($name in ($index.Groups.Keys | Sort-Object)) {
                 $group = $index.Groups[$name]
-                $actions = @(Get-GroupActions $group)
+                $actionObjects = @(Get-GroupActionObjects $group)
                 $groups.Add([ordered]@{
                     name           = $group.name
                     summary        = $group.summary
-                    actionCount    = $actions.Count
-                    actions        = $actions
+                    actionCount    = $actionObjects.Count
+                    actions        = $actionObjects
+                    actionNames    = @($actionObjects | ForEach-Object { $_.name })
                     requiresEditor = $group.requiresEditor
                     requiredMode   = $group.requiredMode
                     mutatesProject = $group.mutatesProject
                     mayReloadDomain = $group.mayReloadDomain
                     optionalPackage = $group.optionalPackage
+                    source         = $group.source
+                    sourcePath     = $group.sourcePath
                 })
             }
 
             $offline = New-Object System.Collections.Generic.List[object]
             foreach ($name in ($index.Offline.Keys | Sort-Object)) {
                 $entry = $index.Offline[$name]
+                $offlineActions = @(Get-GroupActionObjects $entry)
                 $offline.Add([ordered]@{
-                    name    = $entry.name
-                    summary = $entry.summary
-                    actions = @(Get-GroupActions $entry)
+                    name        = $entry.name
+                    summary     = $entry.summary
+                    actionCount = $offlineActions.Count
+                    actions     = $offlineActions
+                    actionNames = @($offlineActions | ForEach-Object { $_.name })
                 })
             }
 
@@ -1560,7 +1694,7 @@ function Invoke-HostExtend {
     $root = Get-ExtensionRoot $ProjectRoot
     $relative = Get-ExtensionRelativeRoot $ProjectRoot
     $manifest = Join-Path $root 'extensions.json'
-    $localRegistry = Join-Path $root 'registry.local.json'
+    $localRegistry = Join-Path $root $Script:ExtensionRegistryFileName
     $index = Get-GroupIndex $ProjectRoot
 
     switch ($action) {
@@ -1585,11 +1719,14 @@ function Invoke-HostExtend {
             foreach ($name in ($index.Groups.Keys | Sort-Object)) {
                 $group = $index.Groups[$name]
                 if ($group.source -ne 'project') { continue }
+                $actionObjects = @(Get-GroupActionObjects $group)
                 $groups.Add([ordered]@{
                     name        = $group.name
                     summary     = $group.summary
-                    actions     = @(Get-GroupActions $group)
-                    actionCount = @(Get-GroupActions $group).Count
+                    actions     = $actionObjects
+                    actionNames = @($actionObjects | ForEach-Object { $_.name })
+                    actionCount = $actionObjects.Count
+                    sourcePath  = $group.sourcePath
                 })
             }
 
@@ -1754,6 +1891,9 @@ GLOBAL OPTIONS
   --project <path>             Unity project root. Defaults to walking up from this script,
                                then from the current directory. Also honours $env:CUCLI_PROJECT.
   --timeout <seconds>          How long to wait for an Editor job (default 60).
+  --action <name>              Explicit spelling of the group action. The positional form wins if
+                               both are given. `action` is reserved and is never sent as a payload
+                               key, so a group parameter must not be named `action`.
   --detach, --no-wait          Queue the job and return its id immediately.
   -h, --help                   Show help.
 
@@ -1833,23 +1973,36 @@ function Invoke-JobDispatch {
     if ($Group -eq 'meta' -and $Action -eq 'export-registry' -and -not $Arguments.Payload.Contains('path')) {
         $scope = [string]$Arguments.Payload['scope']
         if ($scope -eq 'local') {
-            $Arguments.Payload['path'] = Join-Path $ProjectRoot 'Assets/CustomUnityCli.Extensions/registry.local.json'
+            # Route through Get-ExtensionRoot, NOT the preferred folder. Get-ExtensionRoot honours
+            # $env:CUCLI_EXTENSIONS and returns the first EXISTING candidate, so a project that
+            # already keeps its extensions in one of the fallback folders does not silently acquire
+            # a second, dead registry.local.json that nothing ever reads. Hardcoding the preferred
+            # folder here was exactly the divergence Get-ExtensionRoot's contract warns against.
+            $Arguments.Payload['path'] = Join-Path (Get-ExtensionRoot $ProjectRoot) $Script:ExtensionRegistryFileName
         }
         else {
             $Arguments.Payload['path'] = Join-Path (Get-PackageRoot) 'commands/registry.json'
         }
     }
 
+    # From here on use the declared spelling: it is what the worker matches on, and it is what
+    # control-queue routing keys off. This is also what lets `cucli scene get-hierarchy` reach a
+    # C# action declared as `get_hierarchy`.
+    if ($descriptor.name) { $Group = $descriptor.name }
+
     $declared = @(Get-GroupActions $descriptor)
     if ($declared.Count -gt 0) {
         if ([string]::IsNullOrWhiteSpace($Action)) {
             $Action = $declared[0]
-        }
+        } else {
+            $resolvedAction = Resolve-DeclaredName -Declared $declared -Typed $Action
+            if (-not $resolvedAction) {
+                return Write-CucliFailure -ErrorCode 'UNSUPPORTED_ACTION' `
+                    -Message "Group '$Group' has no action '$Action'. Supported: $($declared -join ', ')." `
+                    -Command $Group -Action $Action -Format $Format
+            }
 
-        if ($declared -notcontains $Action) {
-            return Write-CucliFailure -ErrorCode 'UNSUPPORTED_ACTION' `
-                -Message "Group '$Group' has no action '$Action'. Supported: $($declared -join ', ')." `
-                -Command $Group -Action $Action -Format $Format
+            $Action = $resolvedAction
         }
     }
 
@@ -1895,6 +2048,26 @@ function Invoke-JobDispatch {
 function Invoke-CucliMain {
     param([string[]]$Raw)
 
+    # `cucli selftest ...` is forwarded verbatim, before any of our own option parsing.
+    #
+    # The self-test engine has its own parameters (-Tier, -Group, -Action, -KeepScratch, ...) and
+    # forwarding the raw tokens lets PowerShell bind them normally. Re-serialising our camelCased
+    # payload back into flags would lose the original spelling and silently change the engine's
+    # behaviour, which for a verification tool is the one thing that must not happen.
+    if ($Raw.Count -gt 0 -and $Raw[0].ToLowerInvariant() -eq 'selftest') {
+        $engine = Join-Path $Script:ScriptRoot 'cucli-selftest.ps1'
+        if (-not (Test-Path -LiteralPath $engine)) {
+            [Console]::Error.WriteLine(
+                '[cucli] the self-test engine (Tools/cucli-selftest.ps1) is missing from this installation.')
+            exit $Script:ExitProject
+        }
+
+        $forwarded = @()
+        if ($Raw.Count -gt 1) { $forwarded = $Raw[1..($Raw.Count - 1)] }
+        & $engine @forwarded
+        exit $LASTEXITCODE
+    }
+
     $arguments = Split-CucliArguments $Raw
     $format = $arguments.Format
     if ([string]::IsNullOrWhiteSpace($format)) {
@@ -1904,7 +2077,19 @@ function Invoke-CucliMain {
 
     $positional = @($arguments.Positional)
     $group = if ($positional.Count -gt 0) { $positional[0].ToLowerInvariant() } else { $null }
+    # The positional action wins; `--action <name>` is the equivalent explicit spelling. If both are
+    # given the positional one is authoritative, and the conflict is reported on stderr rather than
+    # silently resolved, so a mistyped script is visible.
     $action = if ($positional.Count -gt 1) { $positional[1].ToLowerInvariant() } else { $null }
+    if (-not [string]::IsNullOrWhiteSpace($arguments.Action)) {
+        $explicitAction = ([string]$arguments.Action).Trim().ToLowerInvariant()
+        if ([string]::IsNullOrWhiteSpace($action)) {
+            $action = $explicitAction
+        } elseif ($action -ne $explicitAction) {
+            [Console]::Error.WriteLine(
+                "[warn] both a positional action '$action' and --action '$explicitAction' were given; using the positional one.")
+        }
+    }
 
     if ($arguments.Help -or [string]::IsNullOrWhiteSpace($group) -or $group -eq 'help') {
         return Invoke-HostHelp -Format $format
@@ -1950,6 +2135,7 @@ function Invoke-CucliMain {
         'job'      { return Invoke-HostJob -ProjectRoot $projectRoot -Arguments $arguments -Format $format }
         'open'     { return Invoke-HostOpen -ProjectRoot $projectRoot -Arguments $arguments -Format $format }
         'extend'   { return Invoke-HostExtend -ProjectRoot $projectRoot -Arguments $arguments -Format $format }
+        'selftest' { return Invoke-HostSelftest -Raw $Raw -Format $format }
     }
 
     return Invoke-JobDispatch -ProjectRoot $projectRoot -Group $group -Action $action `

@@ -76,9 +76,17 @@ namespace CustomUnityCli.Editor
         /// <summary>
         /// Provenance: <c>package</c> for commands compiled into custom-unity-cli, <c>project</c> for
         /// commands that live in the host project. Only <c>package</c> commands are ever written into
-        /// the published <c>commands/registry.json</c>.
+        /// the published <c>commands/registry.json</c>, so a project's own command names cannot leak
+        /// into the public repository.
         /// </summary>
         public string Source { get; set; }
+
+        /// <summary>
+        /// Project-relative path of the file that declared a project command: the <c>.cs</c> source for
+        /// a compiled extension, or the JSON file for a declarative one. Null for package commands, and
+        /// null rather than guessed when the source cannot be resolved - a wrong path is worse than none.
+        /// </summary>
+        public string SourcePath { get; set; }
 
         public string Summary { get; set; }
         public CucliActionDescriptor[] Actions { get; set; }

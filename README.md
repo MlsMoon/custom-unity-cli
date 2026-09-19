@@ -19,6 +19,36 @@ whole Editor becomes scriptable.
 
 ---
 
+## Compatibility — read this first
+
+**This tool is for Unity 2022 projects.** It is developed and verified against **Unity 2022.3**,
+and everything here — the Editor worker, the command surface, the file protocol — assumes that
+generation of the Editor API.
+
+> ### Unity 6: use Unity's own CLI instead
+>
+> **This plugin does not target Unity 6 for now, and that is a scope decision rather than an
+> oversight.**
+>
+> If your project is on Unity 6, use **Unity CLI** — the official command-line interface for that
+> generation. It is the supported path there, it is maintained alongside the Editor, and it does not
+> need a bridge package at all:
+>
+> - [Unity CLI reference](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)
+> - [Meet the Unity CLI](https://unity.com/blog/meet-the-unity-cli)
+>
+> Unity 6 has not been considered in this design. The file-queue transport, the domain-reload
+> contract and the command surface were all built and tested against 2022.3 only, so nothing here
+> should be assumed to work on it.
+>
+> The same applies below 2022: the 2021.3 LTS line is untested. Treat **2022.3 as the supported
+> target** and anything else as unsupported.
+
+One thing that can look contradictory: a few command implementations carry forward-compatibility
+guards — a `PhysicMaterial`/`PhysicsMaterial` alias, a reflection path for Unity 6 Build Profiles.
+Those exist so the assembly still *compiles* if someone opens the package in a newer Editor. They are
+not a claim of support, and nothing about the behaviour on those versions has been tested.
+
 ## Why another Unity CLI?
 
 Most Unity automation today means one of three things: an MCP server with a port and a client
@@ -54,8 +84,9 @@ result file. That single design choice buys most of the properties below.
 
 ## What it can do
 
-Roughly 30 Editor command groups plus 8 offline groups. Run `cucli commands list` for the exact
-surface of your build, and `cucli commands describe <group>` for one group's parameter schema.
+**32 Editor command groups carrying 402 actions**, plus 9 offline groups that need no Editor at all.
+Run `cucli commands list` for the exact surface of your build, and `cucli commands describe <group>`
+for one group's parameter schema.
 
 **Offline — works with Unity closed**
 
@@ -102,7 +133,8 @@ surface of your build, and `cucli commands describe <group>` for one group's par
 | `package` | Package Manager add/remove/embed/search, scoped registries. |
 | `code` | Execute a C# snippet and batch several operations in one round trip. |
 | `reflect` | Look up Unity types, members and signatures at runtime. |
-| `meta` | Dump the runtime catalog, export the static registry, report the environment. |
+| `meta` | Dump the runtime catalog, export the static registry, report the environment, scaffold project-local commands. |
+| `selftest` | The tool testing itself: introspection assertions, an action safety surface, a sample report. |
 
 ## Installation
 
@@ -133,7 +165,9 @@ first heartbeat within a second. Confirm with:
 
 ### Requirements
 
-- Unity **2021.3** or newer (developed and verified on 2022.3).
+- **Unity 2022.3** — the supported and verified target. Unity 6 is out of scope for now; use
+  [Unity CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference) there. The 2021.3 LTS
+  line is untested.
 - `com.unity.nuget.newtonsoft-json` — installed automatically by the Package Manager when you
   install this as a git package. If you install it as a plain plugin folder instead, add that
   package yourself; it is the only dependency.
@@ -344,6 +378,55 @@ the folder stays read-only and upgradeable, and deleting `Library/CustomUnityCli
 - [`docs/mcp-parity.md`](docs/mcp-parity.md) — tool-by-tool mapping from MCP for Unity, and the
   deliberate differences.
 - [`CHANGELOG.md`](CHANGELOG.md)
+
+## Developing this package
+
+```powershell
+Tools/verify.ps1              # manifest, .meta coverage, command contract, offline Roslyn compile
+Tools/verify.ps1 -WithUnity   # adds the authoritative batchmode import into a throwaway project
+
+cucli selftest                # black-box self test: drives the CLI through the CLI
+cucli selftest -Tier AB       # contract probes plus behaviour flows
+cucli selftest -Group object,asset -Action object/create
+```
+
+Two different questions, two tools.
+
+`verify.ps1` is a **build** gate. It compiles the Editor sources with Unity's own Roslyn against
+Unity's own reference assemblies, so it catches real type errors in seconds with no Editor process,
+no project lock and no domain reload. `-WithUnity` imports the package into a scratch project whose
+manifest declares **no optional package** — which makes it proof of the "no optional package is
+required" promise rather than an assumption. Neither mode starts, focuses or otherwise touches a
+running Editor.
+
+`cucli selftest` is a **behaviour** gate, and it is the answer to "does this tool actually work?".
+It reaches into nothing: it reads the command surface from the live worker catalog and then talks to
+the Editor exclusively through `Tools/cucli.ps1`, so a green run proves the entire chain —
+PowerShell parser → job file → Editor worker → command → result file → envelope → exit code.
+
+| Tier | What it does |
+| --- | --- |
+| A | Contract probe. Invokes every read-only action with no arguments. A correctly wired command answers with a real payload or a validation error; an unknown command, a dispatch mismatch or an unhandled exception is a defect. This is what catches registry drift, schema gaps and mode-gate bugs across the whole surface. |
+| B | Behaviour. Creates a sandbox under `Assets/CucliSelfTest`, exercises real flows with real payloads, then removes it. |
+| heavy | Opt-in with `-IncludeHeavy`: compilation, package resolve, test runs. Never a real player build, light baking or a manifest write. |
+
+The report lands in `Library/CustomUnityCli/selftest-report.md`; `-KeepSandbox` leaves the sandbox
+behind for inspection. Every declared action belongs to exactly one tier, so "all of it" stays a
+meaningful statement as the surface grows.
+
+### `cucli` never steals focus
+
+This is a design rule, not an accident. Unity defers its `AssetDatabase` refresh until the Editor
+window regains focus, which makes "just bring the window to the front" a tempting shortcut. `cucli`
+does not do it, and does not require it:
+
+- Before the worker has ever been compiled, no out-of-process tool can make the Editor recompile.
+  Use `verify.ps1` above; the Editor will pick the change up whenever it is next focused, and nothing
+  about your session is disturbed in the meantime.
+- Once the worker is compiled, it polls its own job queue from `EditorApplication.update` and calls
+  `RequestScriptCompilation()` itself, so `cucli refresh compile --wait` works with Unity in the
+  background.
+- `cucli open` starts Unity, but only because you asked it to.
 
 ## License
 

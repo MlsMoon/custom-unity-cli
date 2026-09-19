@@ -370,7 +370,8 @@ namespace CustomUnityCli.Editor
                         case "callbacksondisable": Physics2D.callbacksOnDisable = value.Value<bool>(); return true;
                         case "autosynctransforms": Physics2D.autoSyncTransforms = value.Value<bool>(); return true;
                         case "simulationmode":
-                            Physics2D.simulationMode = ParseSimulationMode(value);
+                            // Physics2D has its own enum type; reusing the 3D one would not compile.
+                            Physics2D.simulationMode = ParseSimulationMode2D(value);
                             return true;
                     }
                 }
@@ -414,6 +415,12 @@ namespace CustomUnityCli.Editor
         {
             string text = value.Type == JTokenType.String ? value.Value<string>() : value.ToString();
             return (SimulationMode)Enum.Parse(typeof(SimulationMode), (text ?? "FixedUpdate").Trim(), true);
+        }
+
+        private static SimulationMode2D ParseSimulationMode2D(JToken value)
+        {
+            string text = value.Type == JTokenType.String ? value.Value<string>() : value.ToString();
+            return (SimulationMode2D)Enum.Parse(typeof(SimulationMode2D), (text ?? "FixedUpdate").Trim(), true);
         }
 
         internal static bool ReadVector3(JToken value, out Vector3 result, out string error)
@@ -564,7 +571,9 @@ namespace CustomUnityCli.Editor
                 // project in Script mode would silently stop normal simulation, so the previous mode
                 // is restored. SimulationMode.Unknown is not restorable and is left alone.
                 SimulationMode previous = Physics.simulationMode;
-                bool restore = previous != SimulationMode.Unknown && previous != SimulationMode.Script;
+                // Unity 2022.3's SimulationMode has only FixedUpdate / Update / Script - there is no
+                // "Unknown" member to test for, so only Script is special-cased.
+                bool restore = previous != SimulationMode.Script;
                 if (restore) Physics.simulationMode = SimulationMode.Script;
                 try
                 {
@@ -707,7 +716,7 @@ namespace CustomUnityCli.Editor
             {
                 warnings = page,
                 warning_count = warnings.Count,
-                objects_scanned = single != null ? 1 : -1,
+                objects_scanned = scanned,
                 page_size = pageSize,
                 cursor,
                 next_cursor = end < warnings.Count ? (int?)end : null,
@@ -763,13 +772,7 @@ namespace CustomUnityCli.Editor
                 }
 
                 Collider collider = candidate.GetComponent<Collider>();
-                if (collider != null
-#if UNITY_6000_0_OR_NEWER
-                    && collider.sharedMaterial == null
-#else
-                    && collider.sharedMaterial == null
-#endif
-                    )
+                if (collider != null && collider.sharedMaterial == null)
                 {
                     bump("missing_physics_material");
                     warnings.Add(candidate.name + ": collider has no physics material (friction and bounciness default to the project settings).");

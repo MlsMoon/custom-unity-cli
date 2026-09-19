@@ -278,16 +278,39 @@ namespace CustomUnityCli.Editor
                 "The menu item executed.");
         }
 
+        /// <summary>
+        /// Undo/redo through the Editor menu rather than the scripting API.
+        ///
+        /// <c>Undo.PerformUndo()</c> calls directly into Unity's native undo stack, and that call
+        /// dereferences state the CLI cannot see. It segfaulted the Editor for real here: the crash
+        /// dump for 2026-09-19 17:55:55 ends its managed stack at
+        /// <c>UnityEditor.Undo:PerformUndo -> EditorCommand:UndoRedo</c>, taking the whole project
+        /// down with it. <c>Undo.GetCurrentGroup()</c> reads the same subsystem, so it is gone too.
+        ///
+        /// <c>EditorApplication.ExecuteMenuItem("Edit/Undo")</c> is the path a user takes. It is fully
+        /// supported, it keeps the menu's own enabled/disabled logic authoritative (so an empty stack
+        /// is a clean refusal instead of a crash), and it returns false rather than tearing down the
+        /// process when undo is unavailable.
+        /// </summary>
         private static CucliCommandResult UndoRedo(bool undo)
         {
-            if (undo) Undo.PerformUndo();
-            else Undo.PerformRedo();
+            string menuPath = undo ? "Edit/Undo" : "Edit/Redo";
+
+            if (!EditorApplication.ExecuteMenuItem(menuPath))
+            {
+                string verb = undo ? "undo" : "redo";
+                return CucliCommandResult.Fail(
+                    CucliErrors.WrongMode,
+                    "Nothing to " + verb + ": the " + verb + " stack is empty, or " + menuPath
+                    + " is currently unavailable because the Editor is importing, compiling or in Play Mode.",
+                    new { menuPath, available = false });
+            }
 
             return CucliCommandResult.Ok(new
             {
                 action = undo ? "undo" : "redo",
                 performed = true,
-                currentGroup = Undo.GetCurrentGroup()
+                menuPath
             });
         }
 

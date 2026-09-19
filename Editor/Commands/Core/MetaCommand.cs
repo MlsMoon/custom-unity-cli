@@ -22,11 +22,13 @@ namespace CustomUnityCli.Editor
         public override string Summary =>
             "Inspect and refresh the command surface itself: export the static registry, scaffold project-local commands, report the worker environment.";
 
+        // 'doctor' is first because it is the default action: running bare 'cucli meta' should report
+        // the environment, and the contract requires the declared order to lead with the default.
         public override CucliActionInfo[] Actions => Declare(
+            "doctor", "Worker-side environment report: command diagnostics, optional packages, versions.",
             "export-registry", "Regenerate the shipped commands/registry.json from the compiled package commands only.",
             "catalog", "Dump the runtime command catalog exactly as published to Library/CustomUnityCli.",
             "schema", "Return the parameter JSON schema of one command group.",
-            "doctor", "Worker-side environment report: command diagnostics, optional packages, versions.",
             "extensions", "Report the project-local extension area and the commands it contributes.",
             "new-command", "Scaffold a new project-local command group in the extension area.",
             "verify", "Self-check: validate the extension area and every command's action list against its JSON schema.",
@@ -58,6 +60,10 @@ namespace CustomUnityCli.Editor
     ""actionNames"": {
       ""type"": ""array"", ""items"": { ""type"": ""string"" },
       ""description"": ""action=new-command: sub-action names to scaffold. Defaults to a single 'run' action.""
+    },
+    ""actionName"": {
+      ""type"": ""string"",
+      ""description"": ""action=new-command: a single sub-action to scaffold, as an alternative to actionNames. Note that the bare name 'action' is reserved by the CLI as the group action selector.""
     },
     ""namespace"": { ""type"": ""string"", ""description"": ""action=new-command: C# namespace for the generated file."" },
     ""overwrite"": { ""type"": ""boolean"", ""default"": false, ""description"": ""action=new-command: overwrite an existing file."" }
@@ -197,10 +203,15 @@ namespace CustomUnityCli.Editor
                     new { group });
             }
 
+            // 'actionNames' (plural) is the documented key. The singular fallback is 'actionName', NOT
+            // 'action': 'action' is reserved by the CLI as the group's action selector, so a parameter
+            // with that name could never be passed - the CLI would consume it and silently drop the
+            // user's value.
             string[] actions = context.Input.GetStringList("actionNames");
             if (actions.Length == 0)
             {
-                string single = context.Input.GetString("action");
+                string single = context.Input.GetString("actionName")
+                    ?? context.Input.GetString("action_name");
                 actions = string.IsNullOrWhiteSpace(single) ? new[] { "run" } : new[] { single.Trim() };
             }
 
@@ -421,7 +432,7 @@ namespace " + ns + @"
   """"type"""": """"object"""",
   """"additionalProperties"""": false,
   """"properties"""": {
-    """"action"""": { """"type"""": """"string"""", """"enum"""": [" + enumValues.Replace("\"", "\"\"\"\"") + @"""], """"default"""": """"" + defaultAction + @""""" },
+    """"action"""": { """"type"""": """"string"""", """"enum"""": [" + enumValues.Replace("\"", "\"\"") + @"""], """"default"""": """"" + defaultAction + @""""" },
     """"maxItems"""": { """"type"""": """"integer"""", """"default"""": 64 },
     """"maxDepth"""": { """"type"""": """"integer"""", """"default"""": 4 }
   }
@@ -704,8 +715,33 @@ namespace " + ns + @"
         {
             if (excluded == null || excluded.Count == 0)
             {
-                // Nothing project-local is compiled in, so leave any existing file alone rather than
-                // replacing a hand-maintained one with an empty shell.
+                // Nothing project-local is compiled in any more. A leftover declaration would keep
+                // advertising groups that no longer exist, and the CLI merges this file over the
+                // package registry, so a stale entry would make 'commands list' lie. Remove it rather
+                // than leave it behind - but only when it exists, and never touch a file the project
+                // did not generate (we can tell from its scope marker).
+                if (File.Exists(CucliExtensionPaths.LocalRegistryPath))
+                {
+                    try
+                    {
+                        JObject stale = CucliJson.ParseObject(
+                            File.ReadAllText(CucliExtensionPaths.LocalRegistryPath, CucliJson.Utf8NoBom));
+                        string scope = stale["scope"] == null ? null : stale["scope"].Value<string>();
+                        if (string.Equals(scope, "project-local", StringComparison.Ordinal))
+                        {
+                            File.Delete(CucliExtensionPaths.LocalRegistryPath);
+                            context.Warn("Removed the now-empty project-local command registry: "
+                                + CucliExtensionPaths.RelativeRoot + "/"
+                                + CucliExtensionPaths.LocalRegistryFileName);
+                            return null;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // A file we cannot read or delete is left alone; it is project state.
+                    }
+                }
+
                 return File.Exists(CucliExtensionPaths.LocalRegistryPath)
                     ? CucliExtensionPaths.LocalRegistryPath
                     : null;

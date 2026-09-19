@@ -450,7 +450,10 @@ namespace CustomUnityCli.Editor
                 }
 
                 Vector3 center;
-                if (positionToken == null || !PhysicsCommand.ReadVector3(positionToken, out center, out string positionError))
+                // Declared outside the condition: the || short-circuits when positionToken is null,
+                // which would leave an inline 'out' variable definitely unassigned.
+                string positionError = null;
+                if (positionToken == null || !PhysicsCommand.ReadVector3(positionToken, out center, out positionError))
                 {
                     return CucliCommandResult.Missing(
                         "explosionPosition",
@@ -595,7 +598,9 @@ namespace CustomUnityCli.Editor
 
             if (dimension == PhysicsCommand.Dimension2D)
             {
-                var material2D = ScriptableObject.CreateInstance<PhysicsMaterial2D>();
+                // PhysicsMaterial2D is a plain UnityEngine.Object, not a ScriptableObject, so
+                // CreateInstance<T>() cannot be used for it.
+                var material2D = new PhysicsMaterial2D();
                 material2D.friction = context.Input.GetFloat("friction", 0.4f);
                 material2D.bounciness = context.Input.GetFloat("bounciness", 0f);
                 AssetDatabase.CreateAsset(material2D, assetPath);
@@ -610,7 +615,7 @@ namespace CustomUnityCli.Editor
                 }, "已创建 2D 物理材质。");
             }
 
-            var material = ScriptableObject.CreateInstance<PhysicsMaterial3D>();
+            var material = new PhysicsMaterial3D();
             material.dynamicFriction = context.Input.GetFloat("dynamicFriction", 0.6f);
             material.staticFriction = context.Input.GetFloat("staticFriction", 0.6f);
             material.bounciness = context.Input.GetFloat("bounciness", 0f);
@@ -621,7 +626,7 @@ namespace CustomUnityCli.Editor
             string frictionCombine = context.Input.GetString("frictionCombine");
             if (!string.IsNullOrWhiteSpace(frictionCombine))
             {
-                PhysicsMaterialCombine parsed;
+                PhysicMaterialCombine parsed;
                 if (Enum.TryParse(frictionCombine.Trim(), true, out parsed)) material.frictionCombine = parsed;
                 else context.Warn("frictionCombine '" + frictionCombine + "' was not recognised and was ignored.");
             }
@@ -629,7 +634,7 @@ namespace CustomUnityCli.Editor
             string bounceCombine = context.Input.GetString("bounceCombine");
             if (!string.IsNullOrWhiteSpace(bounceCombine))
             {
-                PhysicsMaterialCombine parsed;
+                PhysicMaterialCombine parsed;
                 if (Enum.TryParse(bounceCombine.Trim(), true, out parsed)) material.bounceCombine = parsed;
                 else context.Warn("bounceCombine '" + bounceCombine + "' was not recognised and was ignored.");
             }
@@ -728,12 +733,12 @@ namespace CustomUnityCli.Editor
                         case "staticfriction": material.staticFriction = property.Value.Value<float>(); break;
                         case "bounciness": material.bounciness = property.Value.Value<float>(); break;
                         case "frictioncombine":
-                            material.frictionCombine = (PhysicsMaterialCombine)Enum.Parse(
-                                typeof(PhysicsMaterialCombine), property.Value.ToString(), true);
+                            material.frictionCombine = (PhysicMaterialCombine)Enum.Parse(
+                                typeof(PhysicMaterialCombine), property.Value.ToString(), true);
                             break;
                         case "bouncecombine":
-                            material.bounceCombine = (PhysicsMaterialCombine)Enum.Parse(
-                                typeof(PhysicsMaterialCombine), property.Value.ToString(), true);
+                            material.bounceCombine = (PhysicMaterialCombine)Enum.Parse(
+                                typeof(PhysicMaterialCombine), property.Value.ToString(), true);
                             break;
                     }
 

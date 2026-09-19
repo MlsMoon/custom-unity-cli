@@ -96,7 +96,12 @@ namespace CustomUnityCli.Editor
 
         public override CucliCommandResult Execute(CucliCommandContext context)
         {
+            // The actions are declared hyphenated ('bake-start') because that is what reads best on a
+            // command line, while the dispatch labels are snake_case ('bake_start'). Folding here is
+            // what makes both spellings work; without it a user typing the declared form would get
+            // UNSUPPORTED_ACTION. physics and so fold the same way.
             string action = ResolveAction(context, "ping");
+            if (!string.IsNullOrEmpty(action)) action = action.Replace('-', '_');
             switch (action)
             {
                 case "ping": return Ping(context);
@@ -570,17 +575,38 @@ namespace CustomUnityCli.Editor
 
         // ---------------------------------------------------------------- light baking
 
+        /// <summary>
+        /// Reads <c>Lightmapping.lightingSettings</c> without letting Unity's getter throw.
+        ///
+        /// The getter raises <c>System.Exception("Lightmapping.lightingSettings is null. Please assign
+        /// it to an existing asset or a new instance.")</c> whenever the active scene has no lighting
+        /// settings assigned, which is the default for a fresh scene. Every read in this file must go
+        /// through here: reading it directly produced unguarded System.Exception failures for
+        /// <c>bake_status</c> and <c>bake_get_settings</c> before this existed.
+        /// </summary>
+        private static LightingSettings SafeLightingSettings()
+        {
+            try
+            {
+                return Lightmapping.lightingSettings;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         private static CucliCommandResult BakeStatus(CucliCommandContext context)
         {
+            LightingSettings current = SafeLightingSettings();
             return CucliCommandResult.Ok(new
             {
                 isRunning = Lightmapping.isRunning,
                 bakedGI = Lightmapping.bakedGI,
                 realtimeGI = Lightmapping.realtimeGI,
                 lightmapCount = LightmapSettings.lightmaps == null ? 0 : LightmapSettings.lightmaps.Length,
-                lightingSettings = Lightmapping.lightingSettings == null
-                    ? null
-                    : CucliAssets.GetAssetPath(Lightmapping.lightingSettings)
+                lightingSettings = current == null ? null : CucliAssets.GetAssetPath(current),
+                hasLightingSettings = current != null
             });
         }
 
@@ -797,7 +823,7 @@ namespace CustomUnityCli.Editor
 
         private static CucliCommandResult BakeGetSettings(CucliCommandContext context)
         {
-            LightingSettings settings = Lightmapping.lightingSettings;
+            LightingSettings settings = SafeLightingSettings();
             if (settings == null)
             {
                 LightingSettings created;
@@ -830,7 +856,7 @@ namespace CustomUnityCli.Editor
 
         private static CucliCommandResult EnsureLightingSettings(out LightingSettings settings)
         {
-            settings = Lightmapping.lightingSettings;
+            settings = SafeLightingSettings();
             if (settings != null) return null;
 
             string folder = "Assets/Settings";
@@ -862,7 +888,7 @@ namespace CustomUnityCli.Editor
                     "settings", "Provide a settings dictionary, e.g. {\"bakedGI\": true, \"lightmapResolution\": 40}.");
             }
 
-            LightingSettings settings = Lightmapping.lightingSettings;
+            LightingSettings settings = SafeLightingSettings();
             if (settings == null)
             {
                 CucliCommandResult failure = EnsureLightingSettings(out settings);

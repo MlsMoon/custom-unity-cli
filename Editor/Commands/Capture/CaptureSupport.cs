@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -12,70 +13,93 @@ using Object = UnityEngine.Object;
 namespace CustomUnityCli.Editor
 {
     /// <summary>
-    /// Shared machinery for the capture groups: where files go, how a texture becomes a PNG, how a
-    /// camera or a Scene view is rendered off-screen, and how a capture run is described on disk.
+    /// Shared machinery for the capture groups: folder policy, file naming, PNG encoding, off-screen
+    /// rendering, render observation and manifests.
     ///
-    /// Two rules shape everything here.
+    /// Three rules shape everything here, and each was taken from a working implementation rather than
+    /// invented.
     ///
-    /// <b>Never mutate what we are photographing.</b> A camera's <c>targetTexture</c>, the active
-    /// render texture, the Scene view's camera and the current render pipeline are saved and restored
-    /// in a <c>finally</c>, and temporary cameras and textures are always destroyed. A screenshot
-    /// command that leaves the Editor visibly altered is worse than one that fails.
+    /// <b>Evidence is never overwritten.</b> An existing PNG or manifest is a refusal, not a
+    /// suggestion: a capture run that silently replaces yesterday's frames destroys the very artefact
+    /// it was run to produce. <c>--force</c> is the only way past it.
     ///
-    /// <b>Bounded output.</b> Every run writes PNG files plus one JSON manifest that records the real
-    /// frame number, timestamp, camera state and any per-frame error. Nothing is written into the
-    /// package, and nothing is written outside <c>Assets/</c>.
+    /// <b>Reading a camera's render texture does not render.</b> Reading an already-created
+    /// <c>targetTexture</c> observes what the game produced; re-rendering it would change the thing
+    /// being measured. Only the Scene view path actively renders, and it restores the camera's target
+    /// texture and the active render texture in a <c>finally</c>.
+    ///
+    /// <b>Nothing is left behind.</b> Temporary cameras, render textures and textures are destroyed on
+    /// every exit path, so a capture cannot poison the next Play/Stop cycle.
     /// </summary>
     internal static class CaptureSupport
     {
-        /// <summary>
-        /// Default output root. The trailing <c>~</c> is Unity's convention for a folder the asset
-        /// pipeline ignores, so captures never trigger an import and never enter a build.
-        /// </summary>
-        internal const string DefaultFolder = "Assets/Docs~/cucli-captures";
+        /// <summary>Unity ignores folders whose name ends in <c>~</c>, so captures never enter a build.</summary>
+        internal const string DocsRoot = "Assets/Docs~/";
+
+        /// <summary>Where <c>capture</c> writes when no folder is given.</summary>
+        internal const string DefaultCaptureFolder = "Assets/Docs~";
+
+        /// <summary>Where <c>recorder</c> writes when no folder is given.</summary>
+        internal const string DefaultRecordingFolder = "Assets/Docs~/Recordings";
 
         internal const string ManifestName = "capture-manifest.json";
         internal const string SessionRelativePath = "capture/recorder.json";
+        internal const string SessionIndexRelativePath = "capture/session-images.json";
+
+        /// <summary><c>0915_渲染分析</c> or <c>20260915_渲染分析</c>.</summary>
+        private static readonly Regex FeatureFolderPattern = new Regex(
+            @"^(\d{4}|\d{8})_[^\\/]+$", RegexOptions.CultureInvariant);
 
         internal static string SessionPath =>
             Path.Combine(CucliPaths.Root, SessionRelativePath.Replace('/', Path.DirectorySeparatorChar));
 
-        // ------------------------------------------------------------------ paths
+        internal static string SessionIndexPath =>
+            Path.Combine(CucliPaths.Root, SessionIndexRelativePath.Replace('/', Path.DirectorySeparatorChar));
+
+        // ------------------------------------------------------------------ folder policy
 
         /// <summary>
-        /// Resolves <c>--output-folder</c> (also accepted as <c>--folder</c> or <c>--output</c>) to a
-        /// project-relative folder under <c>Assets/</c>, creating it on demand. Anything outside
-        /// <c>Assets/</c> is rejected rather than silently written to an arbitrary absolute path.
+        /// Resolves <c>--output-folder</c> / <c>--folder</c> / <c>--output</c> to a project-relative
+        /// folder under <c>Assets/</c>.
+        ///
+        /// The containment test is done on the fully resolved path, not on the string prefix, so
+        /// <c>..</c> traversal cannot escape the project even if it survives the earlier checks.
         /// </summary>
-        internal static bool TryResolveFolder(CucliArgs args, out string projectRelative, out string absolute, out string error)
+        internal static bool TryResolveOutputFolder(
+            CucliArgs args,
+            string fallbackFolder,
+            out string projectRelative,
+            out string absolute,
+            out string error)
         {
             error = null;
             string requested = args.GetString("outputFolder")
                 ?? args.GetString("output_folder")
                 ?? args.GetString("folder")
                 ?? args.GetString("output");
-            if (string.IsNullOrWhiteSpace(requested)) requested = DefaultFolder;
+
+            if (string.IsNullOrWhiteSpace(requested)) requested = fallbackFolder;
+            if (string.IsNullOrWhiteSpace(requested)) requested = DefaultCaptureFolder;
 
             string normalized = requested.Trim().Replace('\\', '/').TrimEnd('/');
+            string projectRoot = CucliPaths.ProjectRoot.Replace('\\', '/');
+
             if (Path.IsPathRooted(normalized))
             {
-                string projectRoot = CucliPaths.ProjectRoot.Replace('\\', '/');
-                if (normalized.StartsWith(projectRoot + "/", StringComparison.OrdinalIgnoreCase))
+                if (!normalized.StartsWith(projectRoot + "/", StringComparison.OrdinalIgnoreCase))
                 {
-                    normalized = normalized.Substring(projectRoot.Length + 1);
-                }
-                else
-                {
-                    error = "Output must live inside the project. Use a project-relative folder such as '"
-                        + DefaultFolder + "', not '" + requested + "'.";
+                    error = "Output must live inside the project. Use a project-relative folder, not '"
+                        + requested + "'.";
                     projectRelative = null;
                     absolute = null;
                     return false;
                 }
+
+                normalized = normalized.Substring(projectRoot.Length + 1);
             }
 
             normalized = normalized.TrimStart('/');
-            if (!normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+            if (!normalized.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
             {
                 error = "Output must be under 'Assets/' so the Editor can reference it; got '" + requested + "'.";
                 projectRelative = null;
@@ -83,9 +107,19 @@ namespace CustomUnityCli.Editor
                 return false;
             }
 
-            projectRelative = "Assets/" + normalized.Substring("Assets/".Length);
-            absolute = Path.Combine(
-                CucliPaths.ProjectRoot, projectRelative.Replace('/', Path.DirectorySeparatorChar));
+            projectRelative = normalized;
+            absolute = Path.GetFullPath(Path.Combine(
+                CucliPaths.ProjectRoot, normalized.Replace('/', Path.DirectorySeparatorChar)));
+
+            string resolvedRoot = Path.GetFullPath(CucliPaths.ProjectRoot) + Path.DirectorySeparatorChar;
+            if (!absolute.StartsWith(resolvedRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                error = "The resolved path '" + absolute + "' escapes the project, so it was refused.";
+                projectRelative = null;
+                absolute = null;
+                return false;
+            }
+
             try
             {
                 Directory.CreateDirectory(absolute);
@@ -101,66 +135,116 @@ namespace CustomUnityCli.Editor
         }
 
         /// <summary>
-        /// Builds the file name for one capture and refuses to clobber an existing file unless
-        /// <c>--force</c> is set, which is what keeps a capture run reproducible instead of silently
-        /// overwriting yesterday's evidence.
+        /// Resolves the <c>Assets/Docs~/&lt;date&gt;_&lt;feature&gt;</c> analysis folder used by
+        /// <c>frame capture</c>.
+        ///
+        /// The name is constrained to a single level under <c>Assets/Docs~/</c> and is auto-prefixed
+        /// with <c>MMdd_</c> when it does not already start with a 4- or 8-digit date, so every capture
+        /// run is dated without the caller having to remember.
         /// </summary>
-        internal static bool TryResolveFileName(
-            CucliArgs args,
+        internal static bool TryResolveFeatureFolder(
+            string requested,
+            out string projectRelative,
+            out string absolute,
+            out string error)
+        {
+            projectRelative = null;
+            absolute = null;
+            error = null;
+
+            if (string.IsNullOrWhiteSpace(requested))
+            {
+                error = "A folder is required: --folder <时间_功能>, for example --folder 0915_渲染分析. "
+                    + "It lands under " + DocsRoot + ".";
+                return false;
+            }
+
+            string name = requested.Trim().Replace('\\', '/');
+            if (name.StartsWith(DocsRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                name = name.Substring(DocsRoot.Length);
+            }
+
+            name = name.Trim('/');
+            if (name.Contains('/') || name.Contains(".."))
+            {
+                error = "'" + requested + "' must be a single folder name under " + DocsRoot
+                    + "; it cannot contain a path separator or '..'. Use --prefix to name the files.";
+                return false;
+            }
+
+            if (!Regex.IsMatch(name, @"^\d{4}_") && !Regex.IsMatch(name, @"^\d{8}_"))
+            {
+                name = DateTime.Now.ToString("MMdd", CultureInfo.InvariantCulture) + "_" + name;
+            }
+
+            if (!FeatureFolderPattern.IsMatch(name))
+            {
+                error = "The folder name must read as <date>_<feature>, for example 0915_渲染分析; got '" + name + "'.";
+                return false;
+            }
+
+            projectRelative = DocsRoot + name;
+            absolute = Path.Combine(
+                CucliPaths.ProjectRoot, projectRelative.Replace('/', Path.DirectorySeparatorChar));
+
+            try
+            {
+                Directory.CreateDirectory(absolute);
+            }
+            catch (Exception exception)
+            {
+                error = "Could not create " + projectRelative + ": " + exception.GetBaseException().Message;
+                absolute = null;
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Validates a file-name prefix. A prefix is a file name fragment, never a path: allowing a
+        /// separator here would let a capture land outside the folder that was just validated.
+        /// </summary>
+        internal static bool TryValidatePrefix(string prefix, out string error)
+        {
+            error = null;
+            if (string.IsNullOrWhiteSpace(prefix)) return true;
+            if (prefix.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || prefix.Contains(".."))
+            {
+                error = "prefix must be a file name fragment, so it cannot contain a path separator, "
+                    + "an invalid file-name character, or '..'. Got '" + prefix + "'.";
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>Builds the output path for one file, refusing to overwrite unless forced.</summary>
+        internal static bool TryResolveFilePath(
             string folderAbsolute,
-            string defaultPrefix,
+            string prefix,
+            string source,
             string extension,
             int index,
+            bool force,
             out string absolutePath,
-            out string fileName,
+            out string relativePath,
             out string error)
         {
             error = null;
-            bool force = args.GetBool("force", false);
-
-            string requested = args.GetString("fileName") ?? args.GetString("file_name")
-                ?? args.GetString("filename") ?? args.GetString("outputFile");
-            string prefix = args.GetString("prefix");
-            if (string.IsNullOrWhiteSpace(prefix)) prefix = defaultPrefix;
-
-            // A caller-supplied name must be a bare file name: a path would escape the folder we just
-            // validated, which is exactly the mistake this guard exists to stop.
-            if (!string.IsNullOrWhiteSpace(requested))
-            {
-                requested = requested.Trim();
-                if (requested.IndexOf('/') >= 0 || requested.IndexOf('\\') >= 0)
-                {
-                    error = "'fileName' must be a bare file name without a path; use '--output-folder' for the folder.";
-                    absolutePath = null;
-                    fileName = null;
-                    return false;
-                }
-
-                fileName = Path.HasExtension(requested) ? requested : requested + extension;
-            }
-            else
-            {
-                string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
-                fileName = index > 0
-                    ? prefix + "-" + stamp + "-" + index.ToString("D4", CultureInfo.InvariantCulture) + extension
-                    : prefix + "-" + stamp + extension;
-            }
+            string stem = string.IsNullOrWhiteSpace(prefix) ? source : prefix.Trim().Trim('-') + "-" + source;
+            if (index > 0) stem += "-" + index.ToString("D3", CultureInfo.InvariantCulture);
+            string fileName = stem + extension;
 
             absolutePath = Path.Combine(folderAbsolute, fileName);
+            relativePath = ToProjectRelative(absolutePath).Replace('\\', '/');
+
             if (File.Exists(absolutePath) && !force)
             {
-                // A second-resolution timestamp can collide inside one sequence; disambiguate rather
-                // than overwrite, unless the caller explicitly asked to overwrite.
-                string stem = Path.GetFileNameWithoutExtension(fileName);
-                string suffix = Path.GetExtension(fileName);
-                int counter = 1;
-                while (File.Exists(absolutePath) && counter < 10000)
-                {
-                    absolutePath = Path.Combine(folderAbsolute, stem + "-" + counter.ToString(CultureInfo.InvariantCulture) + suffix);
-                    counter++;
-                }
-
-                fileName = Path.GetFileName(absolutePath);
+                error = "Refusing to overwrite an existing capture: " + relativePath
+                    + ". Pass --force to replace it, or --prefix to write a new run.";
+                return false;
             }
 
             return true;
@@ -168,7 +252,6 @@ namespace CustomUnityCli.Editor
 
         // ------------------------------------------------------------------ texture IO
 
-        /// <summary>Copies the pixels of a render texture into a readable CPU texture.</summary>
         internal static Texture2D ReadRenderTexture(RenderTexture source, bool linear = false)
         {
             if (source == null) return null;
@@ -187,12 +270,48 @@ namespace CustomUnityCli.Editor
             }
         }
 
+        /// <summary>
+        /// Reads a camera's existing render texture into a CPU texture without rendering anything.
+        ///
+        /// This is the honest way to observe what the game produced: re-rendering would change the
+        /// measurement, and a camera with no created target texture simply has nothing to read yet.
+        /// </summary>
+        internal static bool TryReadCameraTexture(Camera camera, out Texture2D texture, out string error)
+        {
+            texture = null;
+            error = null;
+
+            if (camera == null)
+            {
+                error = "The camera is null.";
+                return false;
+            }
+
+            RenderTexture target = camera.targetTexture;
+            if (target == null || !target.IsCreated())
+            {
+                error = "Camera '" + camera.name + "' has no created targetTexture, so there are no pixels to read. "
+                    + "Run 'cucli frame inspect' to see which render textures exist, or use source=sceneview which "
+                    + "renders on demand.";
+                return false;
+            }
+
+            texture = ReadRenderTexture(target);
+            if (texture == null)
+            {
+                error = "Reading the render texture of '" + camera.name + "' produced no texture.";
+                return false;
+            }
+
+            return true;
+        }
+
         internal static bool TryWritePng(Texture2D texture, string absolutePath, out string error)
         {
             error = null;
             if (texture == null)
             {
-                error = "no texture was produced.";
+                error = "No texture was produced.";
                 return false;
             }
 
@@ -217,7 +336,6 @@ namespace CustomUnityCli.Editor
             }
         }
 
-        /// <summary>Downscales a texture so an inline base64 image cannot flood a response.</summary>
         internal static Texture2D Downscale(Texture2D source, int maxResolution)
         {
             if (source == null || maxResolution <= 0) return source;
@@ -228,8 +346,7 @@ namespace CustomUnityCli.Editor
             int width = Mathf.Max(1, Mathf.RoundToInt(source.width * scale));
             int height = Mathf.Max(1, Mathf.RoundToInt(source.height * scale));
 
-            RenderTexture temporary = RenderTexture.GetTemporary(
-                width, height, 0, RenderTextureFormat.ARGB32);
+            RenderTexture temporary = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
             RenderTexture previous = RenderTexture.active;
             try
             {
@@ -263,228 +380,196 @@ namespace CustomUnityCli.Editor
             }
             catch (Exception)
             {
-                // A texture or camera that Unity already reclaimed is not worth failing a capture over.
+                // Something Unity already reclaimed is not worth failing a capture over.
             }
         }
 
         // ------------------------------------------------------------------ rendering
 
         /// <summary>
-        /// Renders a camera into <paramref name="target"/> and restores the camera's previous target
-        /// texture. Uses the immediate <c>Camera.Render</c> path so a capture does not depend on the
-        /// next frame arriving, which is what makes this usable while paused.
+        /// Renders a camera into a temporary render texture, restoring the camera's target texture and
+        /// the active render texture in a <c>finally</c> so a failure cannot leave the Editor altered.
         /// </summary>
-        internal static bool TryRenderCamera(Camera camera, RenderTexture target, out string error)
+        internal static bool TryRenderCameraToPng(
+            Camera camera,
+            int width,
+            int height,
+            string absolutePath,
+            out string error)
         {
             error = null;
             if (camera == null)
             {
-                error = "the camera is null.";
-                return false;
-            }
-
-            if (target == null)
-            {
-                error = "the render texture is null.";
+                error = "The camera is null.";
                 return false;
             }
 
             RenderTexture previousTarget = camera.targetTexture;
             RenderTexture previousActive = RenderTexture.active;
+            RenderTexture temporary = null;
+            Texture2D texture = null;
             try
             {
-                camera.targetTexture = target;
+                temporary = new RenderTexture(Mathf.Clamp(width, 64, 4096), Mathf.Clamp(height, 64, 4096), 24);
+                camera.targetTexture = temporary;
                 camera.Render();
-                RenderTexture.active = target;
-                return true;
+                RenderTexture.active = temporary;
+
+                texture = new Texture2D(temporary.width, temporary.height, TextureFormat.RGB24, false);
+                texture.ReadPixels(new Rect(0, 0, temporary.width, temporary.height), 0, 0);
+                texture.Apply(false, false);
+                return TryWritePng(texture, absolutePath, out error);
             }
             catch (Exception exception)
             {
-                error = "Camera.Render failed: " + exception.GetBaseException().Message;
+                error = "Rendering '" + camera.name + "' failed: " + exception.GetBaseException().Message;
                 return false;
             }
             finally
             {
                 camera.targetTexture = previousTarget;
                 RenderTexture.active = previousActive;
+                Destroy(texture);
+                if (temporary != null)
+                {
+                    temporary.Release();
+                    Destroy(temporary);
+                }
             }
-        }
-
-        /// <summary>Renders the Scene view's own camera, restoring its target texture afterwards.</summary>
-        internal static bool TryRenderSceneView(SceneView view, RenderTexture target, out string error)
-        {
-            error = null;
-            if (view == null)
-            {
-                error = "no Scene view is open. Open one with Window > General > Scene, or capture the game view instead.";
-                return false;
-            }
-
-            Camera camera = view.camera;
-            if (camera == null)
-            {
-                error = "the Scene view has no camera yet; give it a moment or repaint it first.";
-                return false;
-            }
-
-            return TryRenderCamera(camera, target, out error);
         }
 
         /// <summary>
-        /// Resolves the camera a capture should use: an explicit target wins, then <c>Camera.main</c>,
-        /// then the first enabled camera that is not a Scene view camera.
+        /// Renders the Scene view, restoring its camera's target texture and the active render texture.
+        /// The Scene view is the only source that renders on demand rather than observing existing output.
         /// </summary>
-        internal static bool TryResolveCamera(CucliArgs args, out Camera camera, out string error)
+        internal static bool TryCaptureSceneView(int width, int height, string absolutePath, out string error)
+        {
+            error = null;
+            SceneView view = SceneView.lastActiveSceneView;
+            if (view == null)
+            {
+                var open = OpenSceneViews();
+                if (open.Count > 0) view = open[0];
+            }
+
+            if (view == null)
+            {
+                error = "No Scene view is open. Open one with Window > General > Scene, or use another source.";
+                return false;
+            }
+
+            if (view.camera == null)
+            {
+                error = "The Scene view has no camera yet; wait a frame and retry.";
+                return false;
+            }
+
+            view.Repaint();
+            return TryRenderCameraToPng(view.camera, width, height, absolutePath, out error);
+        }
+
+        internal static List<SceneView> OpenSceneViews()
+        {
+            var views = new List<SceneView>();
+            try
+            {
+                foreach (object entry in SceneView.sceneViews)
+                {
+                    var view = entry as SceneView;
+                    if (view != null) views.Add(view);
+                }
+            }
+            catch (Exception)
+            {
+                // SceneView.sceneViews is a non-generic ArrayList and is empty during shutdown.
+            }
+
+            return views;
+        }
+
+        /// <summary>
+        /// Resolves a camera by name or instance id, including inactive ones - a disabled camera is one
+        /// of the most common reasons a capture comes back empty, so it has to be findable.
+        /// </summary>
+        internal static bool TryResolveCamera(string identity, out Camera camera, out string error)
         {
             camera = null;
             error = null;
 
-            if (args.Has("target") || args.Has("camera") || args.Has("cameraName"))
+            var matches = new List<Camera>();
+            foreach (Camera candidate in Cameras())
             {
-                string requested = args.GetString("target") ?? args.GetString("camera") ?? args.GetString("cameraName");
-                var matches = new List<Camera>();
-                foreach (Camera candidate in Object.FindObjectsOfType<Camera>())
-                {
-                    if (candidate == null) continue;
-                    if (!string.Equals(candidate.name, requested, StringComparison.Ordinal)) continue;
-                    matches.Add(candidate);
-                }
-
-                if (matches.Count == 0)
-                {
-                    int instanceId;
-                    if (int.TryParse(requested, NumberStyles.Integer, CultureInfo.InvariantCulture, out instanceId))
-                    {
-                        foreach (Camera candidate in Object.FindObjectsOfType<Camera>())
-                        {
-                            if (candidate != null && candidate.GetInstanceID() == instanceId)
-                            {
-                                camera = candidate;
-                                return true;
-                            }
-                        }
-                    }
-
-                    error = "no camera named '" + requested + "' exists in the loaded scenes.";
-                    return false;
-                }
-
-                if (matches.Count > 1)
-                {
-                    error = matches.Count + " cameras are named '" + requested
-                        + "'; pass the instance id from 'cucli camera list' instead.";
-                    return false;
-                }
-
-                camera = matches[0];
-                return true;
+                if (candidate == null) continue;
+                if (string.Equals(candidate.name, identity, StringComparison.Ordinal)) matches.Add(candidate);
             }
 
-            camera = Camera.main;
-            if (camera != null) return true;
-
-            foreach (Camera candidate in Object.FindObjectsOfType<Camera>())
+            if (matches.Count == 0)
             {
-                if (candidate == null || !candidate.isActiveAndEnabled) continue;
-                if (candidate.cameraType == CameraType.SceneView) continue;
+                int instanceId;
+                if (int.TryParse(identity, NumberStyles.Integer, CultureInfo.InvariantCulture, out instanceId))
+                {
+                    foreach (Camera candidate in Cameras())
+                    {
+                        if (candidate != null && candidate.GetInstanceID() == instanceId)
+                        {
+                            camera = candidate;
+                            return true;
+                        }
+                    }
+                }
+
+                error = "No camera named or numbered '" + identity + "' exists. Run 'cucli frame inspect' for the list.";
+                return false;
+            }
+
+            if (matches.Count > 1)
+            {
+                error = matches.Count + " cameras are named '" + identity
+                    + "'; pass the instanceId from 'cucli frame inspect' instead.";
+                return false;
+            }
+
+            camera = matches[0];
+            return true;
+        }
+
+        /// <summary>
+        /// The Scene camera: the render-to-texture camera the project uses for its world view.
+        ///
+        /// This is the generic replacement for what the reference implementation looked up through a
+        /// project-specific camera manager: a camera whose target texture already exists is by definition
+        /// the one being rendered into a texture on purpose.
+        /// </summary>
+        internal static bool TryResolveSceneCamera(out Camera camera, out string error)
+        {
+            camera = null;
+            error = null;
+
+            foreach (Camera candidate in Cameras())
+            {
+                if (candidate == null || candidate.cameraType == CameraType.SceneView) continue;
                 if (candidate.cameraType == CameraType.Preview) continue;
+                if (candidate.targetTexture == null || !candidate.targetTexture.IsCreated()) continue;
                 camera = candidate;
                 return true;
             }
 
-            error = "no enabled camera in the loaded scenes; pass --target <name|instanceId>, or create one first.";
+            error = "No camera currently owns a created targetTexture, so there is no Scene camera to read. "
+                + "Run 'cucli frame inspect' to see the cameras and their render targets.";
             return false;
         }
 
-        /// <summary>
-        /// Frames a bounding box with a temporary camera for one axis. The camera is never left behind:
-        /// callers destroy it in a <c>finally</c>.
-        /// </summary>
-        internal static bool TryCreateFramingCamera(
-            Bounds bounds,
-            Vector3 direction,
-            float distanceMultiplier,
-            int resolution,
-            out Camera camera,
-            out string error)
+        /// <summary>Every camera in the loaded scenes, including inactive and Scene-view cameras.</summary>
+        internal static Camera[] Cameras()
         {
-            camera = null;
-            error = null;
-
-            try
-            {
-                var host = new GameObject("cucli-capture-camera");
-                host.hideFlags = HideFlags.HideAndDontSave;
-                camera = host.AddComponent<Camera>();
-                camera.enabled = false;
-                camera.clearFlags = CameraClearFlags.SolidColor;
-                camera.backgroundColor = new Color(0.05f, 0.05f, 0.05f, 1f);
-
-                float radius = Mathf.Max(bounds.extents.magnitude, 0.001f);
-                camera.transform.position = bounds.center + direction.normalized * radius * Mathf.Max(1f, distanceMultiplier);
-                camera.transform.LookAt(bounds.center);
-                camera.nearClipPlane = Mathf.Max(0.01f, radius * 0.01f);
-                camera.farClipPlane = radius * 100f;
-                camera.fieldOfView = 40f;
-                camera.aspect = 1f;
-                camera.targetTexture = null;
-                return true;
-            }
-            catch (Exception exception)
-            {
-                error = "could not create a framing camera: " + exception.GetBaseException().Message;
-                return false;
-            }
+            return Resources.FindObjectsOfTypeAll<Camera>()
+                .Where(camera => camera != null && camera.gameObject.scene.IsValid())
+                .ToArray();
         }
 
-        /// <summary>Six axis-aligned directions, used by the <c>surround</c> batch mode.</summary>
-        internal static Vector3[] SurroundDirections()
-        {
-            return new[]
-            {
-                new Vector3(0f, 0f, -1f),
-                new Vector3(0f, 0f, 1f),
-                new Vector3(-1f, 0f, 0f),
-                new Vector3(1f, 0f, 0f),
-                new Vector3(0f, 1f, 0f),
-                new Vector3(0f, -1f, 0f)
-            };
-        }
+        // ------------------------------------------------------------------ bounds / multiview
 
-        internal static string[] SurroundLabels()
-        {
-            return new[] { "front", "back", "left", "right", "top", "bottom" };
-        }
-
-        /// <summary>Divides a circle into evenly spaced directions at the requested elevations.</summary>
-        internal static Vector3[] OrbitDirections(int views, float[] elevations)
-        {
-            views = Mathf.Clamp(views, 1, 64);
-            if (elevations == null || elevations.Length == 0) elevations = new[] { 20f, -10f };
-
-            var directions = new List<Vector3>();
-            foreach (float elevation in elevations)
-            {
-                float pitch = elevation * Mathf.Deg2Rad;
-                for (int index = 0; index < views; index++)
-                {
-                    float yaw = (360f * index / views) * Mathf.Deg2Rad;
-                    float horizontal = Mathf.Cos(pitch);
-                    directions.Add(new Vector3(
-                        Mathf.Sin(yaw) * horizontal,
-                        Mathf.Sin(pitch),
-                        Mathf.Cos(yaw) * horizontal));
-                }
-            }
-
-            return directions.ToArray();
-        }
-
-        /// <summary>
-        /// Bounds of the capture subject: an explicit target object, else every renderer in the loaded
-        /// scenes, else a unit box at the origin so a capture still produces something reviewable.
-        /// </summary>
-        internal static Bounds ResolveBounds(CucliArgs args, GameObject explicitTarget)
+        internal static Bounds ResolveBounds(GameObject explicitTarget)
         {
             if (explicitTarget != null)
             {
@@ -516,30 +601,65 @@ namespace CustomUnityCli.Editor
             return accumulator ?? new Bounds(Vector3.zero, Vector3.one);
         }
 
-        // ------------------------------------------------------------------ manifests
+        internal static Vector3[] SurroundDirections()
+        {
+            return new[]
+            {
+                new Vector3(0f, 0f, -1f),
+                new Vector3(0f, 0f, 1f),
+                new Vector3(-1f, 0f, 0f),
+                new Vector3(1f, 0f, 0f),
+                new Vector3(0f, 1f, 0f),
+                new Vector3(0f, -1f, 0f)
+            };
+        }
+
+        internal static string[] SurroundLabels()
+        {
+            return new[] { "front", "back", "left", "right", "top", "bottom" };
+        }
 
         /// <summary>
-        /// Writes the run manifest. It is the machine-readable half of a capture: which files, which
-        /// real frame numbers, which camera, and every per-frame error - so a partial failure stays
-        /// reviewable instead of looking like success.
+        /// Creates a temporary framing camera for one axis. Callers must destroy
+        /// <c>camera.gameObject</c> in a <c>finally</c>.
         /// </summary>
-        internal static bool TryWriteManifest(string folderAbsolute, JObject manifest, out string path, out string error)
+        internal static bool TryCreateFramingCamera(
+            string label,
+            Bounds bounds,
+            Vector3 direction,
+            float distanceMultiplier,
+            out Camera camera,
+            out string error)
         {
+            camera = null;
             error = null;
-            path = Path.Combine(folderAbsolute, ManifestName);
             try
             {
-                manifest["schemaVersion"] = "cucli.capture-manifest/v1";
-                manifest["writtenAtUtc"] = DateTime.UtcNow.ToString("O");
-                CucliPaths.WriteAtomic(path, manifest.ToString(Newtonsoft.Json.Formatting.Indented) + Environment.NewLine);
+                var host = new GameObject("cucli-capture-" + label);
+                host.hideFlags = HideFlags.HideAndDontSave;
+                camera = host.AddComponent<Camera>();
+                camera.enabled = false;
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = new Color(0.05f, 0.05f, 0.05f, 1f);
+
+                float radius = Mathf.Max(bounds.extents.magnitude, 0.001f);
+                camera.transform.position = bounds.center
+                    + direction.normalized * radius * Mathf.Max(1f, distanceMultiplier);
+                camera.transform.LookAt(bounds.center);
+                camera.nearClipPlane = Mathf.Max(0.01f, radius * 0.01f);
+                camera.farClipPlane = radius * 100f;
+                camera.fieldOfView = 40f;
+                camera.aspect = 1f;
                 return true;
             }
             catch (Exception exception)
             {
-                error = "could not write the manifest: " + exception.GetBaseException().Message;
+                error = "Could not create a framing camera: " + exception.GetBaseException().Message;
                 return false;
             }
         }
+
+        // ------------------------------------------------------------------ json helpers
 
         internal static JObject CameraJson(Camera camera)
         {
@@ -548,30 +668,44 @@ namespace CustomUnityCli.Editor
                 ["name"] = camera.name,
                 ["instanceId"] = camera.GetInstanceID(),
                 ["enabled"] = camera.enabled,
+                ["active"] = camera.gameObject.activeInHierarchy,
+                ["type"] = camera.cameraType.ToString(),
                 ["orthographic"] = camera.orthographic,
-                ["fieldOfView"] = camera.orthographic ? 0f : camera.fieldOfView,
-                ["orthographicSize"] = camera.orthographic ? camera.orthographicSize : 0f,
+                ["orthographicSize"] = camera.orthographicSize,
+                ["fieldOfView"] = camera.fieldOfView,
                 ["nearClipPlane"] = camera.nearClipPlane,
                 ["farClipPlane"] = camera.farClipPlane,
                 ["depth"] = camera.depth,
                 ["cullingMask"] = camera.cullingMask,
                 ["clearFlags"] = camera.clearFlags.ToString(),
-                ["pixelWidth"] = camera.pixelWidth,
-                ["pixelHeight"] = camera.pixelHeight,
                 ["position"] = CucliDescribe.Value(camera.transform.position, null, 0),
-                ["rotation"] = CucliDescribe.Value(camera.transform.rotation, null, 0)
+                ["rotation"] = CucliDescribe.Value(camera.transform.eulerAngles, null, 0)
             };
 
-            if (camera.targetTexture != null)
+            RenderTexture target = camera.targetTexture;
+            if (target != null)
             {
-                result["targetTexture"] = camera.targetTexture.name;
-                result["targetTextureInstanceId"] = camera.targetTexture.GetInstanceID();
+                result["targetTexture"] = target.name;
+                result["targetTextureInstanceId"] = target.GetInstanceID();
+                result["targetCreated"] = target.IsCreated();
+                result["width"] = target.width;
+                result["height"] = target.height;
+                if (target.IsCreated())
+                {
+                    result["depthFormat"] = target.depthStencilFormat.ToString();
+                }
+            }
+            else
+            {
+                // No target texture means the camera draws to the screen, so its usable size is the viewport.
+                result["targetTexture"] = null;
+                result["width"] = camera.pixelWidth;
+                result["height"] = camera.pixelHeight;
             }
 
             return result;
         }
 
-        /// <summary>Render-pipeline identity without referencing URP: the asset type name is enough.</summary>
         internal static JObject PipelineJson()
         {
             RenderPipelineAsset asset = GraphicsSettings.currentRenderPipeline;
@@ -580,31 +714,20 @@ namespace CustomUnityCli.Editor
                 ["asset"] = asset == null ? null : asset.name,
                 ["assetType"] = asset == null ? "Built-in" : asset.GetType().Name,
                 ["isScriptable"] = asset != null,
-                ["qualityLevel"] = QualitySettings.names != null && QualitySettings.GetQualityLevel() < QualitySettings.names.Length
-                    ? QualitySettings.names[QualitySettings.GetQualityLevel()]
-                    : QualitySettings.GetQualityLevel().ToString(CultureInfo.InvariantCulture),
                 ["colorSpace"] = PlayerSettings.colorSpace.ToString()
             };
         }
 
-        /// <summary>Frames the current Editor time so a capture can be tied back to a timeline.</summary>
-        internal static JObject TimeJson()
+        internal static JObject ScreenJson()
         {
             return new JObject
             {
-                ["frameCount"] = Time.frameCount,
-                ["renderedFrameCount"] = Time.renderedFrameCount,
-                ["time"] = Time.time,
-                ["unscaledTime"] = Time.unscaledTime,
-                ["realtimeSinceStartup"] = Time.realtimeSinceStartup,
-                ["deltaTime"] = Time.deltaTime,
-                ["unscaledDeltaTime"] = Time.unscaledDeltaTime,
-                ["timeScale"] = Time.timeScale,
-                ["captureFramerate"] = Time.captureFramerate,
-                ["targetFrameRate"] = Application.targetFrameRate,
-                ["vSyncCount"] = QualitySettings.vSyncCount,
-                ["isPlaying"] = EditorApplication.isPlaying,
-                ["isPaused"] = EditorApplication.isPaused
+                ["width"] = Screen.width,
+                ["height"] = Screen.height,
+                ["dpi"] = Screen.dpi,
+                ["fullScreen"] = Screen.fullScreen,
+                ["originNote"] = "Screen coordinates have their origin at the bottom-left, which is also what "
+                    + "Input.mousePosition and the Input System report."
             };
         }
 
@@ -621,12 +744,66 @@ namespace CustomUnityCli.Editor
             return absolute.Replace('\\', '/');
         }
 
-        /// <summary>Enumerates capture folders under the default root, newest first.</summary>
+        // ------------------------------------------------------------------ manifest
+
+        /// <summary>
+        /// Writes a run manifest.
+        ///
+        /// Uses <see cref="FileMode.CreateNew"/> deliberately: the manifest is the index that makes a
+        /// capture run auditable, so silently replacing one would orphan the PNGs it describes. Pass
+        /// <paramref name="force"/> to overwrite on purpose.
+        /// </summary>
+        internal static bool TryWriteManifest(
+            string folderAbsolute,
+            string fileNameOrNull,
+            JObject manifest,
+            bool force,
+            out string path,
+            out string error)
+        {
+            error = null;
+            string fileName = string.IsNullOrWhiteSpace(fileNameOrNull) ? ManifestName : fileNameOrNull;
+            path = Path.Combine(folderAbsolute, fileName);
+
+            try
+            {
+                manifest["schemaVersion"] = "cucli.capture-manifest/v1";
+                manifest["writtenAtUtc"] = DateTime.UtcNow.ToString("O");
+                manifest["manifestPath"] = ToProjectRelative(path);
+
+                string json = manifest.ToString(Newtonsoft.Json.Formatting.Indented) + Environment.NewLine;
+                Directory.CreateDirectory(folderAbsolute);
+
+                FileMode mode = force ? FileMode.Create : FileMode.CreateNew;
+                using (var stream = new FileStream(path, mode, FileAccess.Write, FileShare.Read))
+                using (var writer = new StreamWriter(stream, CucliJson.Utf8NoBom))
+                {
+                    writer.Write(json);
+                }
+
+                return true;
+            }
+            catch (IOException exception)
+            {
+                error = File.Exists(path)
+                    ? "A manifest already exists at " + ToProjectRelative(path)
+                      + " and was not overwritten; pass --force or use a different --prefix."
+                    : "Could not write the manifest: " + exception.Message;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                error = "Could not write the manifest: " + exception.GetBaseException().Message;
+                return false;
+            }
+        }
+
+        /// <summary>Enumerates capture folders under the Docs~ root, newest first.</summary>
         internal static List<string> ListCaptureFolders(int limit)
         {
             var folders = new List<string>();
             string root = Path.Combine(
-                CucliPaths.ProjectRoot, DefaultFolder.Replace('/', Path.DirectorySeparatorChar));
+                CucliPaths.ProjectRoot, DefaultCaptureFolder.Replace('/', Path.DirectorySeparatorChar));
             if (!Directory.Exists(root)) return folders;
 
             try
@@ -664,45 +841,68 @@ namespace CustomUnityCli.Editor
     }
 
     /// <summary>
-    /// Which cameras actually rendered during an observation window.
+    /// Which cameras actually rendered during an observation window, and at which real frame.
     ///
-    /// <c>rendered == false</c> is not a diagnosis: the camera may be disabled, culled, on-demand, or
-    /// simply not shown. It only means "no render event for this camera was observed", which is why the
-    /// wording of the result matters as much as the value.
+    /// <c>renderedDuringObservation == false</c> is deliberately not phrased as a diagnosis. The camera
+    /// may be disabled, culled, render-on-demand, or simply not shown; frame advancement is not evidence
+    /// that anything rendered. Recording the real frame number rather than assuming the current one is
+    /// what makes the difference between "we saw it" and "it might have happened".
     /// </summary>
-    internal sealed class RenderObservation
+    internal sealed class RenderObservation : IDisposable
     {
-        private readonly Dictionary<int, string> m_rendered = new Dictionary<int, string>();
+        private struct RenderStamp
+        {
+            internal int Frame;
+            internal double EditorTime;
+        }
+
+        private readonly Dictionary<int, RenderStamp> m_rendered = new Dictionary<int, RenderStamp>();
         private bool m_hooked;
 
-        internal int FramesObserved { get; private set; }
-        internal int FirstFrameNumber { get; private set; } = -1;
-        internal int LastFrameNumber { get; private set; } = -1;
-
-        internal IReadOnlyDictionary<int, string> Rendered => m_rendered;
+        internal int TicksObserved { get; private set; }
 
         internal void Attach()
         {
             if (m_hooked) return;
+            // Both paths are hooked: endCameraRendering covers the Scriptable Render Pipeline, and
+            // Camera.onPreRender covers the Built-in pipeline, so the observation does not silently
+            // depend on which pipeline the project happens to use.
+            RenderPipelineManager.endCameraRendering += OnScriptableCameraRendered;
             Camera.onPreRender += OnBuiltInCamera;
-            RenderPipelineManager.beginCameraRendering += OnScriptableCamera;
             m_hooked = true;
-        }
-
-        internal void Detach()
-        {
-            if (!m_hooked) return;
-            Camera.onPreRender -= OnBuiltInCamera;
-            RenderPipelineManager.beginCameraRendering -= OnScriptableCamera;
-            m_hooked = false;
         }
 
         internal void NoteTick()
         {
-            FramesObserved++;
-            int frame = Time.frameCount;
-            if (FirstFrameNumber < 0) FirstFrameNumber = frame;
-            LastFrameNumber = frame;
+            TicksObserved++;
+        }
+
+        internal bool TryGetStamp(Camera camera, out int frame, out double editorTime)
+        {
+            frame = 0;
+            editorTime = 0;
+            if (camera == null) return false;
+
+            RenderStamp stamp;
+            if (!m_rendered.TryGetValue(camera.GetInstanceID(), out stamp)) return false;
+            frame = stamp.Frame;
+            editorTime = stamp.EditorTime;
+            return true;
+        }
+
+        internal int RenderedCameraCount => m_rendered.Count;
+
+        public void Dispose()
+        {
+            if (!m_hooked) return;
+            RenderPipelineManager.endCameraRendering -= OnScriptableCameraRendered;
+            Camera.onPreRender -= OnBuiltInCamera;
+            m_hooked = false;
+        }
+
+        private void OnScriptableCameraRendered(ScriptableRenderContext context, Camera camera)
+        {
+            Record(camera);
         }
 
         private void OnBuiltInCamera(Camera camera)
@@ -710,19 +910,14 @@ namespace CustomUnityCli.Editor
             Record(camera);
         }
 
-        private void OnScriptableCamera(ScriptableRenderContext context, Camera camera)
-        {
-            Record(camera);
-        }
-
         private void Record(Camera camera)
         {
             if (camera == null) return;
-            int id = camera.GetInstanceID();
-            if (!m_rendered.ContainsKey(id))
+            m_rendered[camera.GetInstanceID()] = new RenderStamp
             {
-                m_rendered[id] = camera.name + " (" + camera.cameraType + ")";
-            }
+                Frame = Time.frameCount,
+                EditorTime = EditorApplication.timeSinceStartup
+            };
         }
     }
 }

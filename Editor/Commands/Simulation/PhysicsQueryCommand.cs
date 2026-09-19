@@ -64,21 +64,46 @@ namespace CustomUnityCli.Editor
 
             if (all)
             {
+                // RaycastAll on a dense scene can return hundreds of hits, so the list is capped and
+                // the true count is reported next to it. Sorting by distance is what makes the cap
+                // meaningful: truncating an unsorted array would return an arbitrary subset.
+                int limit = Mathf.Clamp(context.Input.GetInt("maxItems", 64), 1, 500);
                 var hits = new JArray();
+
                 if (is2D)
                 {
-                    foreach (RaycastHit2D hit in Physics2D.RaycastAll(origin2D, direction2D, maxDistance, mask))
+                    RaycastHit2D[] found2D = Physics2D.RaycastAll(origin2D, direction2D, maxDistance, mask);
+                    Array.Sort(found2D, (left, right) => left.distance.CompareTo(right.distance));
+                    foreach (RaycastHit2D hit in found2D)
                     {
+                        if (hits.Count >= limit) break;
                         hits.Add(Describe2D(hit));
                     }
 
-                    return CucliCommandResult.Ok(new { hit_count = hits.Count, hits });
+                    return CucliCommandResult.Ok(new
+                    {
+                        hit_count = found2D.Length,
+                        returned = hits.Count,
+                        truncated = found2D.Length > hits.Count,
+                        hits
+                    });
                 }
 
                 RaycastHit[] found = Physics.RaycastAll(origin3D, direction3D, maxDistance, mask);
                 Array.Sort(found, (left, right) => left.distance.CompareTo(right.distance));
-                foreach (RaycastHit hit in found) hits.Add(Describe3D(hit));
-                return CucliCommandResult.Ok(new { hit_count = hits.Count, hits });
+                foreach (RaycastHit hit in found)
+                {
+                    if (hits.Count >= limit) break;
+                    hits.Add(Describe3D(hit));
+                }
+
+                return CucliCommandResult.Ok(new
+                {
+                    hit_count = found.Length,
+                    returned = hits.Count,
+                    truncated = found.Length > hits.Count,
+                    hits
+                });
             }
 
             if (is2D)
@@ -395,17 +420,23 @@ namespace CustomUnityCli.Editor
                             "shape", "2D overlap supports circle, box or capsule (got '" + shape + "').");
                 }
 
+                int limit2D = Mathf.Clamp(context.Input.GetInt("maxItems", 64), 1, 500);
+                CucliDescribe.Options options2D = CucliDescribe.OptionsFrom(context.Input);
                 foreach (Collider2D collider in found.Where(item => item != null))
                 {
-                    colliders.Add(new JObject
-                    {
-                        ["gameObject"] = collider.gameObject.name,
-                        ["instanceID"] = collider.gameObject.GetInstanceID(),
-                        ["collider_type"] = collider.GetType().Name
-                    });
+                    if (colliders.Count >= limit2D) break;
+                    // The shared describer keeps this bounded and consistent with every other command
+                    // instead of hand-rolling a collider dump.
+                    colliders.Add(CucliDescribe.UnityObject(collider, options2D, 0));
                 }
 
-                return CucliCommandResult.Ok(new { colliders });
+                return CucliCommandResult.Ok(new
+                {
+                    collider_count = found.Length,
+                    returned = colliders.Count,
+                    truncated = found.Length > colliders.Count,
+                    colliders
+                });
             }
 
             Vector3 position3D;
@@ -458,17 +489,22 @@ namespace CustomUnityCli.Editor
                         "shape", "3D overlap supports sphere, box or capsule (got '" + shape + "').");
             }
 
+            int limit3D = Mathf.Clamp(context.Input.GetInt("maxItems", 64), 1, 500);
+            CucliDescribe.Options options3D = CucliDescribe.OptionsFrom(context.Input);
             foreach (Collider collider in hits.Where(item => item != null))
             {
-                colliders.Add(new JObject
-                {
-                    ["gameObject"] = collider.gameObject.name,
-                    ["instanceID"] = collider.gameObject.GetInstanceID(),
-                    ["collider_type"] = collider.GetType().Name
-                });
+                if (colliders.Count >= limit3D) break;
+                // Same bounded describer as the 2D branch: a full collider dump is never acceptable.
+                colliders.Add(CucliDescribe.UnityObject(collider, options3D, 0));
             }
 
-            return CucliCommandResult.Ok(new { colliders });
+            return CucliCommandResult.Ok(new
+            {
+                collider_count = hits.Length,
+                returned = colliders.Count,
+                truncated = hits.Length > colliders.Count,
+                colliders
+            });
         }
 
         // ------------------------------------------------------------------ shape parsing

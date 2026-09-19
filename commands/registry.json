@@ -3,8 +3,8 @@
   "name": "com.igp.custom-unity-cli",
   "version": "0.1.0",
   "protocolVersion": 1,
-  "generatedAtUtc": "2026-09-19T17:42:16.3410192Z",
-  "catalogHash": "553fea54dbff73a5c7eeee3302582911f979072d10ac8c68da303e16c8a31c30",
+  "generatedAtUtc": "2026-09-19T18:08:59.0807839Z",
+  "catalogHash": "a55b902b12ba45e6e02205c8ab6b58eb8da91ea74ce4fc5a7fbcc64351d92cba",
   "description": "Static declaration of the cucli surface. The 'offline' section is served by Tools/cucli.ps1 itself. The 'groups' section is generated from the compiled Editor worker by 'cucli commands export' so that 'cucli commands list' works even while Unity is closed; an empty array only degrades offline listing, never dispatch. Project-local commands are deliberately NOT written here: they go to registry.local.json inside the project's extension area, outside this package, so project code can never be published with the package.",
   "aliases": {
     "go": "object",
@@ -1275,6 +1275,238 @@
       }
     },
     {
+      "name": "capture",
+      "summary": "Capture the game view, the Scene view or a six-angle surround sheet to PNG, with an optional inlined image.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "filesystem.write",
+        "editor.frame.read"
+      ],
+      "actions": [
+        {
+          "name": "game",
+          "summary": "Capture what a camera renders. Add --include-ui for the overlay-composited game view image."
+        },
+        {
+          "name": "scene-view",
+          "summary": "Render the Scene view camera on demand and restore its render target afterwards."
+        },
+        {
+          "name": "multiview",
+          "summary": "Frame the subject from six axis directions (surround), one PNG per angle."
+        },
+        {
+          "name": "list",
+          "summary": "List the images this session produced, plus capture folders under Assets/Docs~."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "game",
+              "scene-view",
+              "multiview",
+              "list"
+            ],
+            "default": "game"
+          },
+          "outputFolder": {
+            "type": "string",
+            "description": "Project-relative folder under Assets/. Default Assets/Docs~."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Bare file name for a single capture; must not contain a path."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "File name prefix when no filename is given."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "Overwrite an existing file instead of failing with ASSET_EXISTS."
+          },
+          "target": {
+            "type": "string",
+            "description": "Camera name or instance id. Defaults to Camera.main, then the first enabled non-Scene-view camera."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8192
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8192
+          },
+          "superSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 1
+          },
+          "includeUI": {
+            "type": "boolean",
+            "default": false,
+            "description": "game: composite the overlay UI too. Requires Play Mode and waits for the end of a frame."
+          },
+          "includeImage": {
+            "type": "boolean",
+            "default": false,
+            "description": "Inline a base64 PNG in the response."
+          },
+          "maxResolution": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 4096,
+            "default": 640,
+            "description": "Cap applied before an image is inlined."
+          },
+          "batch": {
+            "type": "string",
+            "enum": [
+              "surround",
+              "orbit"
+            ],
+            "default": "surround",
+            "description": "multiview: orbit is not implemented and reports so."
+          },
+          "targetObject": {
+            "type": "string",
+            "description": "multiview: object whose bounds frame the shots. Defaults to all enabled renderers."
+          },
+          "distance": {
+            "type": "number",
+            "default": 2.2,
+            "description": "multiview: camera distance as a multiple of the subject radius."
+          },
+          "resolution": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096,
+            "default": 512,
+            "description": "multiview: square resolution per angle."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          }
+        }
+      }
+    },
+    {
+      "name": "code",
+      "summary": "Execute a C# snippet, batch several command operations in one round trip, or run a menu item.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "code.execute",
+        "project.assets.write",
+        "editor.state.write"
+      ],
+      "actions": [
+        {
+          "name": "run",
+          "summary": "Compile and invoke a C# method body, returning its value as JSON."
+        },
+        {
+          "name": "batch",
+          "summary": "Run several registered command operations in one round trip."
+        },
+        {
+          "name": "menu",
+          "summary": "Execute a menu item by its exact path."
+        },
+        {
+          "name": "history",
+          "summary": "List recently executed snippets."
+        },
+        {
+          "name": "clear-history",
+          "summary": "Delete the snippet history."
+        },
+        {
+          "name": "replay",
+          "summary": "Re-run a snippet from history by index."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "run",
+              "batch",
+              "menu",
+              "history",
+              "clear-history",
+              "replay"
+            ],
+            "default": "run"
+          },
+          "code": {
+            "type": "string",
+            "description": "action=run: the BODY of 'public static object Execute()'. Return a value to receive it as JSON."
+          },
+          "file": {
+            "type": "string",
+            "description": "action=run: read the snippet from a file instead of 'code'."
+          },
+          "safetyChecks": {
+            "type": "boolean",
+            "default": true,
+            "description": "Substring blacklist only; NOT a sandbox."
+          },
+          "compiler": {
+            "type": "string",
+            "enum": [
+              "codedom"
+            ],
+            "default": "codedom"
+          },
+          "operations": {
+            "type": "array",
+            "description": "action=batch: [{ command, action, args }] or MCP-style [{ tool, params }].",
+            "items": {
+              "type": "object"
+            }
+          },
+          "failFast": {
+            "type": "boolean",
+            "default": false
+          },
+          "menuPath": {
+            "type": "string"
+          },
+          "index": {
+            "type": "integer",
+            "description": "action=replay: history index."
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20
+          }
+        }
+      }
+    },
+    {
       "name": "console",
       "summary": "Read the captured Editor console (filter by level, regex and time) or clear it.",
       "requiresEditor": true,
@@ -1535,6 +1767,111 @@
           "maxDepth": {
             "type": "integer",
             "default": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "frame",
+      "summary": "Inspect frame, scene and camera render state over a real observation window, and capture one or many frames to Assets/Docs~.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.frame.read",
+        "filesystem.write"
+      ],
+      "actions": [
+        {
+          "name": "inspect",
+          "summary": "Scene, play/pause, time scale, cameras with projection and clip planes, active render textures, and which cameras actually rendered."
+        },
+        {
+          "name": "capture",
+          "summary": "Write one frame or a timed sequence from the project's Scene camera, a named camera, or the Scene view, plus a manifest."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "inspect",
+              "capture"
+            ],
+            "default": "inspect"
+          },
+          "observeMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5000,
+            "default": 100,
+            "description": "inspect: how long to watch real render callbacks. 0 skips observation entirely."
+          },
+          "folder": {
+            "type": "string",
+            "description": "capture: a single folder name under Assets/Docs~, given as <date>_<feature> (e.g. 0915_渲染分析). A bare feature name is auto-dated."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "all",
+              "scenecam",
+              "camera",
+              "sceneview"
+            ],
+            "default": "all",
+            "description": "capture: all = scenecam + sceneview. scenecam/camera read an existing render texture; sceneview renders on demand."
+          },
+          "camera": {
+            "type": "string",
+            "description": "capture: camera name or instance id, required when source=camera."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "capture: file name prefix. Must not contain a path separator or '..'."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 1,
+            "description": "capture: number of frames. Above 1 each frame is numbered."
+          },
+          "intervalMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "default": 250,
+            "description": "capture: minimum wait between grabs. count-1 times this must not exceed 60000."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096,
+            "default": 1920,
+            "description": "capture: only used by source=sceneview."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096,
+            "default": 1080,
+            "description": "capture: only used by source=sceneview."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "capture: overwrite existing PNGs and manifest instead of refusing."
+          },
+          "includeCameras": {
+            "type": "boolean",
+            "default": true,
+            "description": "inspect: include the per-camera array."
           }
         }
       }
@@ -2030,6 +2367,146 @@
       }
     },
     {
+      "name": "input",
+      "summary": "Inspect the pointer and the UI or world object under it, and synthesise mouse, key or scroll input.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.input.write",
+        "editor.input.read"
+      ],
+      "actions": [
+        {
+          "name": "pointer-inspect",
+          "summary": "What is under the pointer: UI elements with a safe text summary, the Scene-view object, and a game-view physics hit."
+        },
+        {
+          "name": "move",
+          "summary": "Move the pointer to a screen point."
+        },
+        {
+          "name": "click",
+          "summary": "Press and release a mouse button at a screen point, across separate frames."
+        },
+        {
+          "name": "drag",
+          "summary": "Press at a start point, move through waypoints, release."
+        },
+        {
+          "name": "scroll",
+          "summary": "Send a scroll delta."
+        },
+        {
+          "name": "key",
+          "summary": "Press and release a key, as an Editor key event."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "pointer-inspect",
+              "move",
+              "click",
+              "drag",
+              "scroll",
+              "key"
+            ],
+            "default": "pointer-inspect"
+          },
+          "x": {
+            "type": "number",
+            "description": "Screen X. Origin is bottom-left, matching Screen and Input coordinates."
+          },
+          "y": {
+            "type": "number",
+            "description": "Screen Y measured from the bottom."
+          },
+          "button": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right",
+              "middle"
+            ],
+            "default": "left"
+          },
+          "points": {
+            "type": "array",
+            "description": "drag: waypoints as {x,y} or [x,y]. Also accepts @file.json containing a 'points' array.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "deltaX": {
+            "type": "number",
+            "default": 0
+          },
+          "deltaY": {
+            "type": "number",
+            "default": 0
+          },
+          "scrollX": {
+            "type": "number",
+            "default": 0
+          },
+          "scrollY": {
+            "type": "number",
+            "default": 120
+          },
+          "key": {
+            "type": "string",
+            "description": "key: a KeyCode or Event.KeyboardEvent name such as Space, Return, LeftShift, a."
+          },
+          "backend": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "inputsystem",
+              "editor-event"
+            ],
+            "default": "auto",
+            "description": "Which injection backend to use. auto prefers editor-event, and uses inputsystem in Play Mode when asked for explicitly."
+          },
+          "targetWindow": {
+            "type": "string",
+            "description": "editor-event: Editor window type or title to receive the event. Defaults to the focused window, or the active Scene view for pointer gestures."
+          },
+          "holdFrames": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 120,
+            "default": 1,
+            "description": "Frames to hold a button down before releasing."
+          },
+          "settleFrames": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 120,
+            "default": 2,
+            "description": "Frames to wait after injection so the target can react."
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64,
+            "default": 16
+          },
+          "includeText": {
+            "type": "boolean",
+            "default": true,
+            "description": "pointer-inspect: summarise text components. Always through the field allow-list."
+          }
+        }
+      }
+    },
+    {
       "name": "material",
       "summary": "Create materials, write shader properties and colours, assign materials to renderers, inspect a material's shader surface.",
       "requiresEditor": true,
@@ -2153,6 +2630,163 @@
       }
     },
     {
+      "name": "memory",
+      "summary": "Read-only asset and object audits: dangling references, reverse references, duplicate content, unreachable assets.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "editor.memory.read"
+      ],
+      "actions": [
+        {
+          "name": "audit",
+          "summary": "Scan assets for dangling serialized references and report counts by asset type."
+        },
+        {
+          "name": "objects",
+          "summary": "Count loaded objects by type and estimate their memory, largest first."
+        },
+        {
+          "name": "references",
+          "summary": "Find which assets reference a given asset, plus its own dependency count."
+        },
+        {
+          "name": "duplicates",
+          "summary": "Group assets whose content fingerprint is identical."
+        },
+        {
+          "name": "unused",
+          "summary": "List assets that no scene or prefab in the project reaches (candidates, not a verdict)."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "audit",
+              "objects",
+              "references",
+              "duplicates",
+              "unused"
+            ],
+            "default": "audit"
+          },
+          "path": {
+            "type": "string",
+            "description": "action=references: the asset to find referencers of.",
+            "aliases": [
+              "assetPath",
+              "asset_path"
+            ]
+          },
+          "folder": {
+            "type": "string",
+            "description": "Restrict the scan to this folder. Defaults to Assets.",
+            "aliases": [
+              "root",
+              "scope"
+            ]
+          },
+          "typeName": {
+            "type": "string",
+            "description": "action=objects: only count loaded objects of this type.",
+            "aliases": [
+              "type_name",
+              "type"
+            ]
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "memory",
+              "count",
+              "name"
+            ],
+            "default": "memory",
+            "aliases": [
+              "sort_by"
+            ]
+          },
+          "maxScan": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20000,
+            "default": 500,
+            "description": "How many assets a scan may examine before it reports truncation.",
+            "aliases": [
+              "max_scan"
+            ]
+          },
+          "minSize": {
+            "type": "integer",
+            "default": 1024,
+            "description": "action=duplicates: ignore files smaller than this many bytes.",
+            "aliases": [
+              "min_size"
+            ]
+          },
+          "allScenes": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=unused: use every scene in the project, not just the enabled build scenes.",
+            "aliases": [
+              "all_scenes"
+            ]
+          },
+          "includeEmpty": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=objects: include types with zero loaded instances.",
+            "aliases": [
+              "include_empty"
+            ]
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50,
+            "aliases": [
+              "page_size",
+              "limit"
+            ]
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "aliases": [
+              "page_number"
+            ]
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          },
+          "maxStringLength": {
+            "type": "integer",
+            "default": 4096,
+            "aliases": [
+              "max_string_length"
+            ]
+          }
+        }
+      }
+    },
+    {
       "name": "meta",
       "summary": "Inspect and refresh the command surface itself: export the static registry, scaffold project-local commands, report the worker environment.",
       "requiresEditor": true,
@@ -2166,6 +2800,10 @@
       ],
       "actions": [
         {
+          "name": "doctor",
+          "summary": "Worker-side environment report: command diagnostics, optional packages, versions."
+        },
+        {
           "name": "export-registry",
           "summary": "Regenerate the shipped commands/registry.json from the compiled package commands only."
         },
@@ -2176,10 +2814,6 @@
         {
           "name": "schema",
           "summary": "Return the parameter JSON schema of one command group."
-        },
-        {
-          "name": "doctor",
-          "summary": "Worker-side environment report: command diagnostics, optional packages, versions."
         },
         {
           "name": "extensions",
@@ -2234,6 +2868,10 @@
               "type": "string"
             },
             "description": "action=new-command: sub-action names to scaffold. Defaults to a single 'run' action."
+          },
+          "actionName": {
+            "type": "string",
+            "description": "action=new-command: a single sub-action to scaffold, as an alternative to actionNames. Note that the bare name 'action' is reserved by the CLI as the group action selector."
           },
           "namespace": {
             "type": "string",
@@ -2698,6 +3336,320 @@
       }
     },
     {
+      "name": "physics",
+      "summary": "Inspect and configure 3D/2D physics: settings, collision matrix, rigidbodies, forces, materials, casts, stepping, joints.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.settings.write",
+        "editor.scene.read",
+        "editor.scene.write",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Report the physics readiness summary: gravity, solver settings and simulation mode."
+        },
+        {
+          "name": "get-settings",
+          "summary": "Read the 3D or 2D physics world settings."
+        },
+        {
+          "name": "set-settings",
+          "summary": "Write whitelisted 3D or 2D physics world settings."
+        },
+        {
+          "name": "get-collision-matrix",
+          "summary": "Read the layer collision matrix (lower triangle)."
+        },
+        {
+          "name": "set-collision-matrix",
+          "summary": "Enable or disable collision between two layers."
+        },
+        {
+          "name": "get-rigidbody",
+          "summary": "Read a Rigidbody or Rigidbody2D."
+        },
+        {
+          "name": "configure-rigidbody",
+          "summary": "Write whitelisted Rigidbody or Rigidbody2D properties."
+        },
+        {
+          "name": "apply-force",
+          "summary": "Apply a force, torque or explosion to a rigidbody."
+        },
+        {
+          "name": "create-physics-material",
+          "summary": "Create a PhysicMaterial (3D) or PhysicsMaterial2D resource."
+        },
+        {
+          "name": "configure-physics-material",
+          "summary": "Write whitelisted physics material properties."
+        },
+        {
+          "name": "assign-physics-material",
+          "summary": "Assign a physics material to a collider on a target."
+        },
+        {
+          "name": "raycast",
+          "summary": "Cast a ray and return the first hit."
+        },
+        {
+          "name": "raycast-all",
+          "summary": "Cast a ray and return every hit."
+        },
+        {
+          "name": "linecast",
+          "summary": "Cast between two points and return the first hit."
+        },
+        {
+          "name": "shapecast",
+          "summary": "Sweep a sphere, box or capsule and return the first hit."
+        },
+        {
+          "name": "overlap",
+          "summary": "Return every collider overlapping a sphere, box or capsule."
+        },
+        {
+          "name": "simulate-step",
+          "summary": "Advance the physics world manually and report rigidbody motion."
+        },
+        {
+          "name": "add-joint",
+          "summary": "Add a joint to a target."
+        },
+        {
+          "name": "configure-joint",
+          "summary": "Configure an existing joint's properties, motor, limits, spring or drive."
+        },
+        {
+          "name": "remove-joint",
+          "summary": "Remove joints from a target."
+        },
+        {
+          "name": "validate",
+          "summary": "Sweep the loaded scenes for common physics misconfigurations."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "get-settings",
+              "set-settings",
+              "get-collision-matrix",
+              "set-collision-matrix",
+              "get-rigidbody",
+              "configure-rigidbody",
+              "apply-force",
+              "create-physics-material",
+              "configure-physics-material",
+              "assign-physics-material",
+              "raycast",
+              "raycast-all",
+              "linecast",
+              "shapecast",
+              "overlap",
+              "simulate-step",
+              "add-joint",
+              "configure-joint",
+              "remove-joint",
+              "validate"
+            ]
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "3d",
+              "2d",
+              "both"
+            ],
+            "description": "3d (default), 2d, or both for validate."
+          },
+          "target": {
+            "type": "string",
+            "description": "GameObject name, hierarchy path or instance id."
+          },
+          "searchMethod": {
+            "type": "string",
+            "description": "Name, hierarchy path, instance id, tag, layer or component."
+          },
+          "settings": {
+            "type": "object",
+            "description": "Whitelisted world settings to write."
+          },
+          "layerA": {
+            "type": "string",
+            "description": "Layer name or 0-31 index."
+          },
+          "layerB": {
+            "type": "string",
+            "description": "Layer name or 0-31 index."
+          },
+          "collide": {
+            "type": "boolean",
+            "default": true
+          },
+          "properties": {
+            "type": "object",
+            "description": "Whitelisted properties to write."
+          },
+          "forceType": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "explosion"
+            ],
+            "default": "normal"
+          },
+          "force": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "torque": {},
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "forceMode": {
+            "type": "string"
+          },
+          "explosionForce": {
+            "type": "number"
+          },
+          "explosionPosition": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "explosionRadius": {
+            "type": "number"
+          },
+          "upwardsModifier": {
+            "type": "number",
+            "default": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "materialPath": {
+            "type": "string"
+          },
+          "colliderType": {
+            "type": "string"
+          },
+          "componentIndex": {
+            "type": "integer"
+          },
+          "origin": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "direction": {},
+          "start": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "end": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "maxDistance": {
+            "type": "number"
+          },
+          "layerMask": {},
+          "queryTriggerInteraction": {
+            "type": "string",
+            "enum": [
+              "UseGlobal",
+              "Ignore",
+              "Collide"
+            ]
+          },
+          "shape": {
+            "type": "string"
+          },
+          "size": {},
+          "angle": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "capsuleDirection": {
+            "type": "integer"
+          },
+          "point1": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "point2": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "steps": {
+            "type": "integer",
+            "default": 1
+          },
+          "stepSize": {
+            "type": "number"
+          },
+          "jointType": {
+            "type": "string"
+          },
+          "connectedBody": {
+            "type": "string"
+          },
+          "motor": {
+            "type": "object"
+          },
+          "limits": {
+            "type": "object"
+          },
+          "spring": {
+            "type": "object"
+          },
+          "drive": {
+            "type": "object"
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 50
+          },
+          "cursor": {
+            "type": "integer",
+            "default": 0
+          }
+        }
+      }
+    },
+    {
       "name": "prefab",
       "summary": "Prefab 资产：从场景物体创建、读取信息与层级、在隔离上下文中修改内容，以及 Prefab Stage 的打开/保存/关闭。",
       "requiresEditor": true,
@@ -2854,6 +3806,742 @@
           "pageNumber": {
             "type": "integer",
             "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "probuilder",
+      "summary": "Create and edit ProBuilder meshes: shapes, topology, face material/colour/UV, smoothing, validation.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": "com.unity.probuilder",
+      "effects": [
+        "editor.scene.read",
+        "editor.scene.write",
+        "project.assets.write"
+      ],
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Report ProBuilder availability and the resolved type surface."
+        },
+        {
+          "name": "create-shape",
+          "summary": "Generate a ProBuilder primitive."
+        },
+        {
+          "name": "create-poly-shape",
+          "summary": "Extrude a polygon outline into a solid."
+        },
+        {
+          "name": "extrude-faces",
+          "summary": "Extrude faces by a distance."
+        },
+        {
+          "name": "extrude-edges",
+          "summary": "Extrude edges by a distance."
+        },
+        {
+          "name": "bevel-edges",
+          "summary": "Bevel edges."
+        },
+        {
+          "name": "subdivide",
+          "summary": "Subdivide faces."
+        },
+        {
+          "name": "delete-faces",
+          "summary": "Delete faces."
+        },
+        {
+          "name": "bridge-edges",
+          "summary": "Bridge two open edges."
+        },
+        {
+          "name": "connect-elements",
+          "summary": "Connect elements across selected faces or edges."
+        },
+        {
+          "name": "detach-faces",
+          "summary": "Detach faces into a separate object."
+        },
+        {
+          "name": "flip-normals",
+          "summary": "Flip the normals of faces."
+        },
+        {
+          "name": "merge-faces",
+          "summary": "Merge faces into one."
+        },
+        {
+          "name": "combine-meshes",
+          "summary": "Combine several ProBuilder meshes into one."
+        },
+        {
+          "name": "merge-objects",
+          "summary": "Merge several objects into one ProBuilder mesh."
+        },
+        {
+          "name": "duplicate-and-flip",
+          "summary": "Duplicate faces and flip the copies."
+        },
+        {
+          "name": "create-polygon",
+          "summary": "Create a face from existing vertices."
+        },
+        {
+          "name": "merge-vertices",
+          "summary": "Merge vertices into a single one."
+        },
+        {
+          "name": "weld-vertices",
+          "summary": "Weld nearby vertices."
+        },
+        {
+          "name": "split-vertices",
+          "summary": "Split shared vertices."
+        },
+        {
+          "name": "move-vertices",
+          "summary": "Translate vertices by an offset."
+        },
+        {
+          "name": "insert-vertex",
+          "summary": "Insert a vertex on a face or edge."
+        },
+        {
+          "name": "append-vertices-to-edge",
+          "summary": "Insert evenly spaced vertices along edges."
+        },
+        {
+          "name": "select-faces",
+          "summary": "Select faces by direction, growth, flood or loop."
+        },
+        {
+          "name": "set-face-material",
+          "summary": "Assign a material to faces."
+        },
+        {
+          "name": "set-face-color",
+          "summary": "Assign a vertex colour to faces."
+        },
+        {
+          "name": "set-face-uvs",
+          "summary": "Apply UV scale/offset/rotation/flip to faces."
+        },
+        {
+          "name": "get-mesh-info",
+          "summary": "Report mesh counts, bounds, materials and optional face/edge detail."
+        },
+        {
+          "name": "convert-to-probuilder",
+          "summary": "Convert a plain Mesh into a ProBuilder mesh."
+        },
+        {
+          "name": "set-smoothing",
+          "summary": "Set the smoothing group on faces."
+        },
+        {
+          "name": "auto-smooth",
+          "summary": "Apply automatic smoothing by angle threshold."
+        },
+        {
+          "name": "center-pivot",
+          "summary": "Move the mesh so its pivot is centred."
+        },
+        {
+          "name": "freeze-transform",
+          "summary": "Bake the transform into the vertices."
+        },
+        {
+          "name": "set-pivot",
+          "summary": "Move the pivot to a world position without moving the mesh."
+        },
+        {
+          "name": "validate-mesh",
+          "summary": "Report degenerate triangles and unused vertices."
+        },
+        {
+          "name": "repair-mesh",
+          "summary": "Remove degenerate triangles from the mesh."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "create-shape",
+              "create-poly-shape",
+              "extrude-faces",
+              "extrude-edges",
+              "bevel-edges",
+              "subdivide",
+              "delete-faces",
+              "bridge-edges",
+              "connect-elements",
+              "detach-faces",
+              "flip-normals",
+              "merge-faces",
+              "combine-meshes",
+              "merge-objects",
+              "duplicate-and-flip",
+              "create-polygon",
+              "merge-vertices",
+              "weld-vertices",
+              "split-vertices",
+              "move-vertices",
+              "insert-vertex",
+              "append-vertices-to-edge",
+              "select-faces",
+              "set-face-material",
+              "set-face-color",
+              "set-face-uvs",
+              "get-mesh-info",
+              "convert-to-probuilder",
+              "set-smoothing",
+              "auto-smooth",
+              "center-pivot",
+              "freeze-transform",
+              "set-pivot",
+              "validate-mesh",
+              "repair-mesh"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "GameObject name, hierarchy path or instance id."
+          },
+          "searchMethod": {
+            "type": "string"
+          },
+          "shapeType": {
+            "type": "string",
+            "description": "Cube, Cylinder, Sphere, Plane, Cone, Torus, Pipe, Arch, Stair, CurvedStair, Door, Prism."
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "rotation": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "size": {},
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "depth": {
+            "type": "number"
+          },
+          "radius": {
+            "type": "number"
+          },
+          "points": {
+            "type": "array"
+          },
+          "extrudeHeight": {
+            "type": "number"
+          },
+          "flipNormals": {
+            "type": "boolean"
+          },
+          "faceIndices": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "edgeIndices": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "edges": {
+            "type": "array"
+          },
+          "edgeA": {
+            "type": "object"
+          },
+          "edgeB": {
+            "type": "object"
+          },
+          "vertexIndices": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "distance": {
+            "type": "number"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "method": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "point": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "faceIndex": {
+            "type": "integer"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "color": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "materialPath": {
+            "type": "string"
+          },
+          "smoothingGroup": {
+            "type": "integer"
+          },
+          "angleThreshold": {
+            "type": "number"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "include": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "faces",
+              "edges",
+              "all"
+            ],
+            "default": "summary"
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          }
+        }
+      }
+    },
+    {
+      "name": "profiler",
+      "summary": "Unity Profiler：会话开关与还原、帧计时、计数器（分页）、对象内存、内存快照、Frame Debugger。",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.profiler.read",
+        "editor.profiler.write",
+        "filesystem.write"
+      ],
+      "actions": [
+        {
+          "name": "status",
+          "summary": "报告 Profiler 与各 area 的当前开关状态，以及是否有可还原的会话快照。"
+        },
+        {
+          "name": "ping",
+          "summary": "连通性探测。"
+        },
+        {
+          "name": "start",
+          "summary": "开启 Profiler；可选写二进制日志与采集分配调用栈。开始前会记录原状态。"
+        },
+        {
+          "name": "stop",
+          "summary": "关闭 Profiler 并还原 start 之前的状态，避免污染下一次采样。"
+        },
+        {
+          "name": "set-areas",
+          "summary": "按 ProfilerArea 枚举名逐项开关采集区域。"
+        },
+        {
+          "name": "frame-timing",
+          "summary": "读取最近一帧的 CPU/GPU 帧计时；未开启 Frame Timing Stats 时给出可诊断说明。"
+        },
+        {
+          "name": "counters",
+          "summary": "读取某个 ProfilerCategory 下的计数器（分页 + 名称过滤 + 扫描上限）。"
+        },
+        {
+          "name": "object-memory",
+          "summary": "按场景层级路径或资产路径查询单个对象的运行时内存占用。"
+        },
+        {
+          "name": "snapshot-take",
+          "summary": "用 Memory Profiler 包抓取 .snap 快照（异步 + 超时 + 取消）。"
+        },
+        {
+          "name": "snapshot-list",
+          "summary": "列出 .snap 快照文件及其大小与创建时间（分页）。"
+        },
+        {
+          "name": "snapshot-compare",
+          "summary": "比较两个快照的文件级元数据（不做对象级 diff）。"
+        },
+        {
+          "name": "frame-debugger-enable",
+          "summary": "开启 Frame Debugger；Play Mode 未暂停时拒绝并提示先暂停。"
+        },
+        {
+          "name": "frame-debugger-disable",
+          "summary": "关闭 Frame Debugger。"
+        },
+        {
+          "name": "frame-debugger-events",
+          "summary": "按游标分页读取 Frame Debugger 事件列表。"
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "ping",
+              "start",
+              "stop",
+              "set-areas",
+              "frame-timing",
+              "counters",
+              "object-memory",
+              "snapshot-take",
+              "snapshot-list",
+              "snapshot-compare",
+              "frame-debugger-enable",
+              "frame-debugger-disable",
+              "frame-debugger-events"
+            ],
+            "default": "status"
+          },
+          "logFile": {
+            "type": "string",
+            "description": "start: 二进制日志输出路径；目录必须已存在。也接受 log_file."
+          },
+          "enableCallstacks": {
+            "type": "boolean",
+            "default": false,
+            "description": "start: 采集分配调用栈。也接受 enable_callstacks."
+          },
+          "areas": {
+            "type": "object",
+            "description": "set-areas: 键为 ProfilerArea 枚举名（大小写不敏感），值为布尔。例如把 CPU 设为 true、GPU 设为 false。"
+          },
+          "category": {
+            "type": "string",
+            "description": "counters: ProfilerCategory 名，如 Render / Scripts / Memory / Physics。"
+          },
+          "counters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "counters: 只看名称包含这些子串的计数器；省略则按名称顺序取前 maxCounters 个。"
+          },
+          "maxCounters": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096,
+            "default": 256,
+            "description": "counters: 扫描上限；命中更多时会标记 scanTruncated。也接受 max_counters."
+          },
+          "objectPath": {
+            "type": "string",
+            "description": "object-memory: 场景层级路径或资产路径。也接受 object_path."
+          },
+          "snapshotPath": {
+            "type": "string",
+            "description": "snapshot-take: 输出 .snap 路径；省略则写入临时缓存目录。也接受 snapshot_path."
+          },
+          "searchPath": {
+            "type": "string",
+            "description": "snapshot-list: 搜索目录；省略则搜临时缓存与工程根两处。也接受 search_path."
+          },
+          "snapshotA": {
+            "type": "string",
+            "description": "snapshot-compare: 第一个快照文件。也接受 snapshot_a."
+          },
+          "snapshotB": {
+            "type": "string",
+            "description": "snapshot-compare: 第二个快照文件。也接受 snapshot_b."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 32,
+            "description": "也接受 page_size."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "frame-debugger-events: 起始偏移（整数）。"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "pageSize 的别名。"
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 30,
+            "description": "snapshot-take: 等待快照完成的秒数。也接受 timeout_seconds."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "recorder",
+      "summary": "Run a resumable capture session: record frames to PNG, or drive the Unity Recorder package for video when it is installed.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "filesystem.write",
+        "editor.frame.read"
+      ],
+      "actions": [
+        {
+          "name": "status",
+          "summary": "Read the session record; works after a domain reload or an Editor restart."
+        },
+        {
+          "name": "start",
+          "summary": "Begin a session. Refuses if one is already recording."
+        },
+        {
+          "name": "stop",
+          "summary": "End the active session, write its manifest and report the summary. Idempotent."
+        },
+        {
+          "name": "frame",
+          "summary": "Capture exactly one frame now, inside the active session or on its own."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "start",
+              "stop",
+              "frame"
+            ],
+            "default": "status"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "frames",
+              "video"
+            ],
+            "default": "auto",
+            "description": "auto picks frames and reports why; video needs the Unity Recorder package."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "game",
+              "sceneview",
+              "scenecam"
+            ],
+            "default": "game"
+          },
+          "target": {
+            "type": "string",
+            "description": "Camera name or instance id for source=game."
+          },
+          "outputFolder": {
+            "type": "string",
+            "description": "Defaults to Assets/Docs~/Recordings."
+          },
+          "prefix": {
+            "type": "string",
+            "default": "rec"
+          },
+          "intervalMs": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 10000,
+            "default": 200
+          },
+          "maxFrames": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 120
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096
+          },
+          "fps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 120,
+            "default": 30,
+            "description": "video: frame rate for the Recorder."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "frame: overwrite an existing PNG."
+          }
+        }
+      }
+    },
+    {
+      "name": "reflect",
+      "summary": "Look up loaded types, their members and their signatures. Answers come from this Editor's real assemblies.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.state.read"
+      ],
+      "actions": [
+        {
+          "name": "get-type",
+          "summary": "Describe one type: kind, namespace, assembly and the members it declares itself."
+        },
+        {
+          "name": "get-member",
+          "summary": "Resolve a single member by name, searching base types."
+        },
+        {
+          "name": "search",
+          "summary": "Find types and members whose name contains a fragment (capped, paged)."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "get-type",
+              "get-member",
+              "search"
+            ],
+            "default": "get-type"
+          },
+          "typeName": {
+            "type": "string",
+            "description": "get-type / get-member: short or fully qualified type name."
+          },
+          "memberName": {
+            "type": "string",
+            "description": "get-member: member to resolve, searched up the base chain."
+          },
+          "query": {
+            "type": "string",
+            "description": "search: case-insensitive name fragment."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "any",
+              "type",
+              "method",
+              "property",
+              "field",
+              "event"
+            ],
+            "default": "any"
+          },
+          "includeInherited": {
+            "type": "boolean",
+            "default": true,
+            "description": "get-type: include inherited members. True by default; set false, or use declaredOnly, for MCP's declared-only view."
+          },
+          "declaredOnly": {
+            "type": "boolean",
+            "default": false,
+            "description": "get-type: list only the members this type declares itself, matching MCP's get_type."
+          },
+          "includeNoisy": {
+            "type": "boolean",
+            "default": false,
+            "description": "get-type: include hideFlags/runInEditMode and friends."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 500
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Opaque cursor from a previous page."
           }
         }
       }
@@ -3361,6 +5049,71 @@
               "maxStringLength"
             ],
             "description": "action=read: 返回内容的最大字符数。"
+          }
+        }
+      }
+    },
+    {
+      "name": "selftest",
+      "summary": "Test the tool itself: echo a payload back, verify the shared helpers, and classify every registered action.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.state.read",
+        "filesystem.write"
+      ],
+      "actions": [
+        {
+          "name": "core",
+          "summary": "Run assertions over the shared helper layer (args, values, describe, paging, reflection, serialized, assets, paths, json)."
+        },
+        {
+          "name": "echo",
+          "summary": "Return the payload unchanged plus a token, to prove end-to-end fidelity through the queue."
+        },
+        {
+          "name": "surface",
+          "summary": "Classify every registered action as read-only, mutating or destructive, with its safety metadata."
+        },
+        {
+          "name": "sample",
+          "summary": "Produce a compact overview: group and action counts, helper check summary, optional package availability."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "echo",
+              "core",
+              "surface",
+              "sample"
+            ],
+            "default": "core"
+          },
+          "token": {
+            "type": "string",
+            "description": "action=echo: arbitrary token echoed back verbatim."
+          },
+          "mutate": {
+            "type": "boolean",
+            "default": false,
+            "description": "Allow the few checks that must write (a temporary folder, runtime scratch files)."
+          },
+          "group": {
+            "type": "string",
+            "description": "action=surface: restrict the plan to one group."
+          },
+          "verbose": {
+            "type": "boolean",
+            "default": false,
+            "description": "Include a detail line for every passing check."
           }
         }
       }
@@ -4203,6 +5956,868 @@
           "tooltip": {
             "type": "string",
             "description": "action=modify_visual_element: element.tooltip."
+          }
+        }
+      }
+    },
+    {
+      "name": "vfx",
+      "summary": "粒子系统、VFX Graph、LineRenderer 与 TrailRenderer 的创建、读取与写值（particle_* / vfx_* / line_* / trail_*）。",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write",
+        "editor.scene.write"
+      ],
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "存活探测，返回本组支持的组件族。"
+        },
+        {
+          "name": "particle_create",
+          "summary": "在目标上创建/补齐 ParticleSystem 并设置变换。"
+        },
+        {
+          "name": "particle_get_info",
+          "summary": "读取粒子系统主模块、发射、形状与渲染器摘要（限量）。"
+        },
+        {
+          "name": "particle_set_main",
+          "summary": "写主模块：duration/loop/prewarm/startLifetime/startSpeed/startSize/startColor/gravityModifier/simulationSpace/scalingMode/maxParticles。"
+        },
+        {
+          "name": "particle_set_emission",
+          "summary": "写发射模块：enabled/rateOverTime/rateOverDistance。"
+        },
+        {
+          "name": "particle_set_shape",
+          "summary": "写形状模块：shapeType/radius/radiusThickness/angle/arc/position/rotation/scale。"
+        },
+        {
+          "name": "particle_set_color_over_lifetime",
+          "summary": "写生命周期颜色模块。"
+        },
+        {
+          "name": "particle_set_size_over_lifetime",
+          "summary": "写生命周期尺寸模块（含分轴尺寸）。"
+        },
+        {
+          "name": "particle_set_velocity_over_lifetime",
+          "summary": "写生命周期速度模块。"
+        },
+        {
+          "name": "particle_set_noise",
+          "summary": "写噪声模块：strength/frequency/scrollSpeed/damping/octaveCount/quality。"
+        },
+        {
+          "name": "particle_set_renderer",
+          "summary": "写 ParticleSystemRenderer：renderMode/sortMode/alignment/尺寸与拖尾参数/材质。"
+        },
+        {
+          "name": "particle_enable_module",
+          "summary": "按名启用或禁用某个模块。"
+        },
+        {
+          "name": "particle_play",
+          "summary": "播放（withChildren 默认 true）。"
+        },
+        {
+          "name": "particle_stop",
+          "summary": "停止。"
+        },
+        {
+          "name": "particle_pause",
+          "summary": "暂停。"
+        },
+        {
+          "name": "particle_restart",
+          "summary": "清空并重新播放。"
+        },
+        {
+          "name": "particle_clear",
+          "summary": "清空已发射粒子。"
+        },
+        {
+          "name": "particle_add_burst",
+          "summary": "追加一个 burst，并返回其索引。"
+        },
+        {
+          "name": "particle_clear_bursts",
+          "summary": "清除全部 burst。"
+        },
+        {
+          "name": "vfx_create_asset",
+          "summary": "创建 .vfx 资产（可指定模板与目录，支持 overwrite）。"
+        },
+        {
+          "name": "vfx_assign_asset",
+          "summary": "把 .vfx 资产绑定到目标上的 VisualEffect。"
+        },
+        {
+          "name": "vfx_list_templates",
+          "summary": "列出可用的 VFX 模板。"
+        },
+        {
+          "name": "vfx_list_assets",
+          "summary": "列出工程中的 VFX 资产。"
+        },
+        {
+          "name": "vfx_get_info",
+          "summary": "读取 VisualEffect 摘要：资产、存活粒子数、pause、playRate、startSeed。"
+        },
+        {
+          "name": "vfx_set_float",
+          "summary": "写暴露的 float 参数。"
+        },
+        {
+          "name": "vfx_set_int",
+          "summary": "写暴露的 int 参数。"
+        },
+        {
+          "name": "vfx_set_bool",
+          "summary": "写暴露的 bool 参数。"
+        },
+        {
+          "name": "vfx_set_vector2",
+          "summary": "写暴露的 Vector2 参数。"
+        },
+        {
+          "name": "vfx_set_vector3",
+          "summary": "写暴露的 Vector3 参数。"
+        },
+        {
+          "name": "vfx_set_vector4",
+          "summary": "写暴露的 Vector4 参数。"
+        },
+        {
+          "name": "vfx_set_color",
+          "summary": "写暴露的 Color 参数。"
+        },
+        {
+          "name": "vfx_set_gradient",
+          "summary": "写暴露的 Gradient 参数（键名是 gradient）。"
+        },
+        {
+          "name": "vfx_set_texture",
+          "summary": "写暴露的 Texture 参数。"
+        },
+        {
+          "name": "vfx_set_mesh",
+          "summary": "写暴露的 Mesh 参数。"
+        },
+        {
+          "name": "vfx_set_curve",
+          "summary": "写暴露的 AnimationCurve 参数。"
+        },
+        {
+          "name": "vfx_send_event",
+          "summary": "按名发送事件，并写入 position/velocity/color/size/lifetime 属性。"
+        },
+        {
+          "name": "vfx_play",
+          "summary": "播放 VisualEffect。"
+        },
+        {
+          "name": "vfx_stop",
+          "summary": "停止 VisualEffect。"
+        },
+        {
+          "name": "vfx_pause",
+          "summary": "切换 VisualEffect 的 pause（注意是切换，不是幂等暂停）。"
+        },
+        {
+          "name": "vfx_reinit",
+          "summary": "重新初始化 VisualEffect。"
+        },
+        {
+          "name": "vfx_set_playback_speed",
+          "summary": "写 playRate。"
+        },
+        {
+          "name": "vfx_set_seed",
+          "summary": "写 startSeed 与 resetSeedOnPlay。"
+        },
+        {
+          "name": "line_get_info",
+          "summary": "读取 LineRenderer 摘要与位置列表（按 maxItems 截断）。"
+        },
+        {
+          "name": "line_set_positions",
+          "summary": "整组写入位置并重设 positionCount。"
+        },
+        {
+          "name": "line_add_position",
+          "summary": "在末尾追加一个位置。"
+        },
+        {
+          "name": "line_set_position",
+          "summary": "改写指定索引的位置。"
+        },
+        {
+          "name": "line_set_width",
+          "summary": "写宽度：width/startWidth/endWidth/widthCurve/widthMultiplier。"
+        },
+        {
+          "name": "line_set_color",
+          "summary": "写颜色或渐变（线不淡出末端）。"
+        },
+        {
+          "name": "line_set_material",
+          "summary": "设置线材质；未给路径时尝试解析工程内默认材质。"
+        },
+        {
+          "name": "line_set_properties",
+          "summary": "批量写位置数、宽度、loop、useWorldSpace 与通用渲染器属性。"
+        },
+        {
+          "name": "line_clear",
+          "summary": "清空位置。"
+        },
+        {
+          "name": "line_create_line",
+          "summary": "把已存在的 LineRenderer 写为一条线段（不创建组件）。"
+        },
+        {
+          "name": "line_create_circle",
+          "summary": "把已存在的 LineRenderer 写为一个圆（不创建组件）。"
+        },
+        {
+          "name": "line_create_arc",
+          "summary": "把已存在的 LineRenderer 写为一段圆弧（不创建组件）。"
+        },
+        {
+          "name": "line_create_bezier",
+          "summary": "把已存在的 LineRenderer 写为贝塞尔曲线（不创建组件）。"
+        },
+        {
+          "name": "trail_get_info",
+          "summary": "读取 TrailRenderer 摘要。"
+        },
+        {
+          "name": "trail_set_time",
+          "summary": "写拖尾时长。"
+        },
+        {
+          "name": "trail_set_width",
+          "summary": "写宽度：width/startWidth/endWidth/widthCurve/widthMultiplier。"
+        },
+        {
+          "name": "trail_set_color",
+          "summary": "写颜色或渐变（拖尾末端 alpha 置 0，会淡出）。"
+        },
+        {
+          "name": "trail_set_material",
+          "summary": "设置拖尾材质；未给路径时尝试解析工程内默认材质。"
+        },
+        {
+          "name": "trail_set_properties",
+          "summary": "批量写时长、发射、顶点间距与通用渲染器属性。"
+        },
+        {
+          "name": "trail_clear",
+          "summary": "清空拖尾。"
+        },
+        {
+          "name": "trail_emit",
+          "summary": "向拖尾追加一个位置。"
+        }
+      ],
+      "parametersSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "cucli vfx",
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "动作名，不区分大小写；按 particle_ / vfx_ / line_ / trail_ 前缀分派。",
+            "enum": [
+              "ping",
+              "particle_create",
+              "particle_get_info",
+              "particle_set_main",
+              "particle_set_emission",
+              "particle_set_shape",
+              "particle_set_color_over_lifetime",
+              "particle_set_size_over_lifetime",
+              "particle_set_velocity_over_lifetime",
+              "particle_set_noise",
+              "particle_set_renderer",
+              "particle_enable_module",
+              "particle_play",
+              "particle_stop",
+              "particle_pause",
+              "particle_restart",
+              "particle_clear",
+              "particle_add_burst",
+              "particle_clear_bursts",
+              "vfx_create_asset",
+              "vfx_assign_asset",
+              "vfx_list_templates",
+              "vfx_list_assets",
+              "vfx_get_info",
+              "vfx_set_float",
+              "vfx_set_int",
+              "vfx_set_bool",
+              "vfx_set_vector2",
+              "vfx_set_vector3",
+              "vfx_set_vector4",
+              "vfx_set_color",
+              "vfx_set_gradient",
+              "vfx_set_texture",
+              "vfx_set_mesh",
+              "vfx_set_curve",
+              "vfx_send_event",
+              "vfx_play",
+              "vfx_stop",
+              "vfx_pause",
+              "vfx_reinit",
+              "vfx_set_playback_speed",
+              "vfx_set_seed",
+              "line_get_info",
+              "line_set_positions",
+              "line_add_position",
+              "line_set_position",
+              "line_set_width",
+              "line_set_color",
+              "line_set_material",
+              "line_set_properties",
+              "line_clear",
+              "line_create_line",
+              "line_create_circle",
+              "line_create_arc",
+              "line_create_bezier",
+              "trail_get_info",
+              "trail_set_time",
+              "trail_set_width",
+              "trail_set_color",
+              "trail_set_material",
+              "trail_set_properties",
+              "trail_clear",
+              "trail_emit"
+            ],
+            "default": "ping"
+          },
+          "target": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "searchMethod": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "materialPath": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "material_path": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "material": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "assetName": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "asset_path": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "folderPath": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "folder": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "search": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "template": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "parameter": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "texturePath": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "meshPath": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "eventName": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "module": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "simulationSpace": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "scalingMode": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "shapeType": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "space": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "quality": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "renderMode": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "sortMode": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "alignment": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "textureMode": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "shadowCastingMode": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "lightProbeUsage": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "reflectionProbeUsage": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "motionVectorGenerationMode": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "sortingLayerName": {
+            "type": "string",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "duration": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "playOnAwake": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "looping": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "prewarm": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "maxParticles": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "rateOverTime": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "rateOverDistance": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "radius": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "radiusThickness": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "angle": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "arc": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "width": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "startWidth": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "endWidth": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "widthMultiplier": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "time": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "minVertexDistance": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "minCount": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "maxCount": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "count": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "cycles": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "interval": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "probability": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "frequency": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "octaveCount": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "strength": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "speedModifier": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "minParticleSize": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "maxParticleSize": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "lengthScale": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "velocityScale": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "cameraVelocityScale": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "normalDirection": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "shadowBias": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "playRate": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "seed": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "segments": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "startAngle": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "endAngle": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "positionCount": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "numCornerVertices": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "numCapVertices": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "sortingOrder": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "sortingLayerID": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "index": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "componentIndex": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "component_index": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "maxItems": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "maxDepth": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "maxStringLength": {
+            "type": "number",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "separateAxes": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "damping": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "allowRoll": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "withChildren": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "resetSeedOnPlay": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "loop": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "useWorldSpace": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "generateLightingData": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "receiveShadows": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "autodestruct": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "emitting": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "includeValues": {
+            "type": "boolean",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "positions": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "position": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "rotation": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "scale": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "velocity": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "color": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "startColor": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "endColor": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "gradient": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "start": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "end": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "center": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "normal": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "controlPoint1": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "controlPoint2": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "control1": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "control2": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "value": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "size": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "startDelay": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "startLifetime": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "startSpeed": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "startSize": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "startRotation": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "gravityModifier": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "x": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "y": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "z": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "sizeX": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "sizeY": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "sizeZ": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "widthCurve": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "scrollSpeed": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "pivot": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
+          },
+          "flip": {
+            "type": "array",
+            "description": "见 docs 中 vfx 组的参数表；多个类型可接受时会回落到默认值。"
           }
         }
       }

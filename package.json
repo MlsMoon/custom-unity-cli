@@ -2,8 +2,8 @@
   "name": "com.igp.custom-unity-cli",
   "version": "0.1.0",
   "displayName": "Custom Unity CLI",
-  "description": "A zero-configuration, offline-friendly command line interface for the Unity Editor. Ships a single Editor worker package plus a dependency-free PowerShell entry point: a file-queue job system drives Unity from the terminal, CI or an AI agent without ports, servers, MCP or per-project configuration.",
-  "unity": "2021.3",
+  "description": "A zero-configuration, offline-friendly command line interface for the Unity Editor. Ships a single Editor worker package plus a dependency-free PowerShell entry point: a file-queue job system drives Unity from the terminal, CI or an AI agent without ports, servers, MCP or per-project configuration. Targets Unity 2022; Unity 6 projects should use Unity's own CLI instead.",
+  "unity": "2022.3",
   "keywords": [
     "unity",
     "cli",

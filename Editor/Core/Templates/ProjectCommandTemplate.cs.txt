@@ -1,0 +1,100 @@
+// ---------------------------------------------------------------------------------------------
+// Template used by `cucli extend scaffold`.
+//
+// Tokens replaced before the file is written:
+//   __CLASS__         e.g. LightingCommand
+//   __GROUP__         e.g. lighting          (the `cucli <group>` name)
+//   __SUMMARY__       one-line group summary
+//   __ACTIONS__       "name", "summary", ... pairs for Declare(...)
+//   __ACTION_NAMES__  a JSON array of the action names, for reference
+//   __FIRST_ACTION__  the default action
+//   __METHOD__        PascalCase method name for the first action
+//   __SCHEMA__        the parameter schema, already escaped for a verbatim string
+//
+// Keep this file compiling as-is after substitution. It is deliberately a working command, not a
+// stub: it resolves a target through the shared resolver and bounds its output through
+// CucliDescribe, which are the two things a hand-written first draft most often gets wrong.
+// ---------------------------------------------------------------------------------------------
+using System;
+using Newtonsoft.Json.Linq;
+using UnityEditor;
+using UnityEngine;
+
+namespace CustomUnityCli.Editor
+{
+    /// <summary>
+    /// Project-local command group '__GROUP__'.
+    ///
+    /// This file lives in the host project, not in the custom-unity-cli package, so it is committed
+    /// to the project's version control and is never exported into the package's public registry.
+    /// </summary>
+    internal sealed class __CLASS__ : CucliCommand
+    {
+        public override string Name => "__GROUP__";
+
+        public override string Summary => "__SUMMARY__";
+
+        public override CucliActionInfo[] Actions => Declare(
+__ACTIONS__);
+
+        public override bool RequiresEditor => true;
+
+        // Any | Edit | Play. Use Edit when an action must be refused during Play Mode; the worker
+        // enforces it before the command runs and reports WRONG_MODE.
+        public override CucliMode RequiredMode => CucliMode.Any;
+
+        // Set to true as soon as any action writes assets, scene objects or project settings.
+        public override bool MutatesProject => false;
+
+        // Auditable side-effect classes, e.g. "project.assets.write", "editor.scene.write",
+        // "editor.play-mode.write". These are published in the catalog so callers can decide whether
+        // an action is safe to run unattended.
+        public override string[] Effects => new[] { "editor.state.read" };
+
+        // Set to true only if an action can trigger a script recompile or a domain reload. Such jobs
+        // are parked in jobs/waiting before execution and resolved after the reload.
+        public override bool MayReloadDomain => false;
+
+        // Set to a package name (e.g. "com.unity.probuilder") only when the whole group needs it, and
+        // reach that package through CucliOptional reflection rather than an assembly reference.
+        public override string OptionalPackage => null;
+
+        public override string ParametersSchemaJson => @"__SCHEMA__";
+
+        public override CucliCommandResult Execute(CucliCommandContext context)
+        {
+            string action = ResolveAction(context, "__FIRST_ACTION__");
+            switch (action)
+            {
+                case "__FIRST_ACTION__": return __METHOD__(context);
+                // case "other-action": return Other(context);
+                default: return CucliCommandResult.Unsupported(action, ActionNames());
+            }
+        }
+
+        private static CucliCommandResult __METHOD__(CucliCommandContext context)
+        {
+            // Resolve targets through CucliObjectResolver instead of hand-rolling a name lookup: it
+            // already handles instance ids, hierarchy paths, names, tags, layers and inactive objects,
+            // and it searches every loaded scene.
+            string error;
+            GameObject target = CucliObjectResolver.ResolveGameObject(context.Input, out error);
+            if (context.Input.Has("target") && error != null)
+            {
+                return CucliCommandResult.Fail(CucliErrors.TargetNotFound, error);
+            }
+
+            // Bound every dump. CucliDescribe collapses a UnityEngine.Object to a reference and
+            // truncates collections, so a Mesh or a TextMeshProUGUI can never flood the caller.
+            CucliDescribe.Options options = CucliDescribe.OptionsFrom(context.Input);
+
+            return CucliCommandResult.Ok(new
+            {
+                group = Name,
+                action,
+                target = target == null ? null : CucliObjectResolver.HierarchyPath(target, true),
+                detail = target == null ? null : CucliDescribe.Components(target, options, 0)
+            }, "TODO: 用一句中文结论替换这里。");
+        }
+    }
+}

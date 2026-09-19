@@ -34,6 +34,8 @@ namespace CustomUnityCli.Editor
         {
             internal ICucliCommand Command;
             internal bool FromPackage;
+            /// <summary>Kept so the descriptor can report where a project command came from.</summary>
+            internal Type Type;
         }
 
         private static readonly Dictionary<string, Registration> Commands =
@@ -75,6 +77,12 @@ namespace CustomUnityCli.Editor
                 .ThenBy(candidate => candidate.FullName, StringComparer.Ordinal))
             {
                 if (type.IsAbstract || type.IsInterface || type.IsGenericTypeDefinition) continue;
+
+                // A command built from a project-side JSON declaration is instantiated by its loader
+                // with the definition and origin, so it deliberately has no parameterless constructor.
+                // It is derived from ICucliCommand, so TypeCache finds it, and without this exclusion
+                // every project would report a spurious COMMAND_CONSTRUCTOR_MISSING in `cucli doctor`.
+                if (typeof(CucliLocalCommand).IsAssignableFrom(type)) continue;
 
                 // Deliberately no accessibility check. Every command in this package is
                 // `internal sealed class`, and project extensions are usually internal too; the
@@ -136,7 +144,12 @@ namespace CustomUnityCli.Editor
                     continue;
                 }
 
-                Commands.Add(name, new Registration { Command = command, FromPackage = fromPackage });
+                Commands.Add(name, new Registration
+                {
+                    Command = command,
+                    FromPackage = fromPackage,
+                    Type = type
+                });
             }
 
             CucliCommandDescriptor[] all = Descriptors();
@@ -182,7 +195,8 @@ namespace CustomUnityCli.Editor
         internal static CucliCommandDescriptor[] Descriptors()
         {
             return Commands.Values
-                .Select(registration => Describe(registration.Command, registration.FromPackage))
+                .Select(registration => Describe(
+                    registration.Command, registration.FromPackage, registration.Type))
                 .OrderBy(descriptor => descriptor.Name, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
@@ -190,12 +204,14 @@ namespace CustomUnityCli.Editor
         internal static CucliCommandDescriptor Describe(ICucliCommand command)
         {
             Registration registration;
-            bool fromPackage = Commands.TryGetValue(command.Name ?? string.Empty, out registration)
-                && registration.FromPackage;
-            return Describe(command, fromPackage);
+            bool registered = Commands.TryGetValue(command.Name ?? string.Empty, out registration);
+            return Describe(
+                command,
+                registered && registration.FromPackage,
+                registered ? registration.Type : command.GetType());
         }
 
-        private static CucliCommandDescriptor Describe(ICucliCommand command, bool fromPackage)
+        private static CucliCommandDescriptor Describe(ICucliCommand command, bool fromPackage, Type type)
         {
             CucliActionInfo[] actions = SafeActions(command);
             var descriptors = new CucliActionDescriptor[actions.Length];
@@ -212,6 +228,7 @@ namespace CustomUnityCli.Editor
             {
                 Name = command.Name,
                 Source = fromPackage ? SourcePackage : SourceProject,
+                SourcePath = fromPackage ? null : SourcePathOf(command, type),
                 Summary = SafeSummary(command),
                 Actions = descriptors,
                 ParametersSchemaJson = SafeSchema(command),
@@ -224,6 +241,18 @@ namespace CustomUnityCli.Editor
                     ? null
                     : command.OptionalPackage
             };
+        }
+
+        /// <summary>
+        /// Best-effort source of a project command. A declarative command knows the JSON file that
+        /// declared it; a compiled one is resolved through the compilation pipeline's own source list.
+        /// Null means "unknown", never a guess.
+        /// </summary>
+        private static string SourcePathOf(ICucliCommand command, Type type)
+        {
+            var local = command as CucliLocalCommand;
+            if (local != null) return local.Origin;
+            return type == null ? null : CucliExtensions.SourcePathOf(type);
         }
 
         private static CucliActionInfo[] SafeActions(ICucliCommand command)

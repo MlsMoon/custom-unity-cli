@@ -9,76 +9,22 @@ change to `cucli.ps1`.
 
 | Where | Belongs to | Published with the package? |
 | --- | --- | --- |
-| `Editor/Commands/**` inside this package | everyone using the tool | yes — it is reviewed and versioned with the package |
-| `<project>/Assets/CustomUnityCliExtensions/Commands/**` | the host project only | **no** |
+| `Editor/Commands/**` inside this package | everyone using the tool | yes - reviewed and versioned with the package |
+| `<project>/Assets/CustomUnityCli.Extensions/Editor/Commands/**` | the host project only | **no** |
 
-Both are discovered identically. The difference is ownership, and it matters: the package is a
-published artifact that is replaced wholesale on upgrade, so project-specific commands placed inside
-it would be destroyed on the next pull — and would leak into the public repository on the way.
+Both are discovered identically by reflection; the difference is ownership. The rest of this page
+covers writing a group. For the extension area itself - where it lives, how to scaffold one, and the
+four mechanisms that keep project code out of the published repository - read
+[`self-iteration.md`](self-iteration.md).
 
-### The project-local extension area
+The three things an author needs from that page:
 
-```text
-<project>/Assets/CustomUnityCliExtensions/     default; outside the package
-├── cucli.extension.json                       manifest (schemaVersion cucli.extension/v1)
-├── README.md                                  explains the area to whoever finds it
-├── Commands/                                  project command groups
-├── Notes/                                     project invariants worth rediscovering
-└── registry.local.json                        generated; project commands for offline listing
-```
-
-```powershell
-./cucli.ps1 extend init                                  # create the area; Unity may be closed
-./cucli.ps1 meta new-command --group assetpolicy --summary "本项目的资产命名约定" --action check
-./cucli.ps1 refresh compile --wait
-./cucli.ps1 assetpolicy check
-```
-
-Set `$env:CUCLI_EXTENSIONS` to relocate the area (absolute, or project-relative). The location is an
-environment variable rather than a settings file because it is a machine-or-team choice, not
-per-command configuration.
-
-**No assembly definition is needed.** Any `Editor/` folder under `Assets/` compiles into
-`Assembly-CSharp-Editor`, which automatically references every assembly definition marked
-`autoReferenced` — and `CustomUnityCli.Editor` is one. So a plain `.cs` file is the whole ceremony.
-
-### How the package boundary is enforced
-
-Four independent mechanisms, because "please do not commit that" is not an enforcement strategy:
-
-1. **Provenance tagging.** `CucliCommandRegistry` records whether each command came from the package
-   assembly or from the project, and exposes it as `source: package` / `source: project` on every
-   descriptor.
-2. **Split export.** `cucli commands export` writes `commands/registry.json` with **package commands
-   only** and routes project commands to `registry.local.json` inside the extension area. A project
-   command therefore cannot be published by running a refresh.
-3. **Dual hashes.** `catalogHash` covers package commands and is what the shipped registry records,
-   so drift detection keeps working in a project that has grown its own commands.
-   `fullCatalogHash` covers everything and is reported for diagnostics.
-4. **A leak check.** `cucli meta extensions` reports the extension root, the source files it found,
-   and any file sitting **inside** the package tree — the one arrangement that would publish project
-   code. The package's own `.gitignore` carries matching safety-net ignores.
-
-`cucli commands list` shows which commands are project-local, and `cucli doctor` reports registry
-drift plus the worker's command counts per source.
-
-### Shadowing a package group
-
-A project command may register the **same name** as a package group. The project wins, and the
-registry reports it as a `COMMAND_SHADOWED` diagnostic rather than applying it silently:
-
-```text
-diagnostics[]: { code: "COMMAND_SHADOWED", commandName: "build", message: "Project command overrides the package command registered by CustomUnityCli.Editor.BuildCommand." }
-```
-
-This is the supported way to adapt the tool's behaviour for one project without forking it. Two
-projects doing this to the same group usually means the behaviour belongs upstream.
-
-### Upstreaming
-
-Project commands are not second-class: the same contract, the same helpers, the same tests. When one
-turns out to be generally useful, move the file into `Editor/Commands/<Domain>/` and run
-`cucli commands export` — as a reviewed change, not as a side effect of running a command.
+- No assembly definition and no configuration are required. A plain `Editor/` folder under
+  `Assets/` compiles into `Assembly-CSharp-Editor`, which already references this package.
+- `cucli meta new-command --group <name>` scaffolds a compiling group into the extension area;
+  `cucli extend init|list|path` manages the area and works with Unity closed.
+- `cucli commands export` publishes **package commands only**. Your group is written to
+  `registry.local.json` inside the extension area instead, so it cannot reach the public repository.
 
 ## The contract
 

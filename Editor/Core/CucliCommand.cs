@@ -97,6 +97,16 @@ namespace CustomUnityCli.Editor
     }
 
     /// <summary>
+    /// Registers a set of commands that does not map one-to-one onto types. The project-local
+    /// declarative commands use this: one JSON file on disk becomes one command. The registry
+    /// discovers implementors exactly the way it discovers commands.
+    /// </summary>
+    public interface ICucliCommandProvider
+    {
+        IEnumerable<ICucliCommand> CreateCommands();
+    }
+
+    /// <summary>
     /// Everything a command needs: the parsed payload, an identity for logging and a cancellation
     /// token that is checked at every recoverable boundary.
     /// </summary>
@@ -237,6 +247,20 @@ namespace CustomUnityCli.Editor
             var names = new string[Actions.Length];
             for (int index = 0; index < Actions.Length; index++) names[index] = Actions[index].Name;
             return names;
+        }
+
+        /// <summary>
+        /// The <c>enum</c> array body for a schema's <c>action</c> property, generated from
+        /// <see cref="Actions"/> so the schema can never disagree with the declarations.
+        ///
+        /// Groups with more than a handful of actions should build their schema with this instead of
+        /// hand-listing the names: a schema that omits an action is invisible to anything reading
+        /// <c>commands describe</c> rather than <c>commands list</c>, and a schema listing a removed
+        /// action advertises something that will fail.
+        /// </summary>
+        protected string ActionEnumJson()
+        {
+            return "\"" + string.Join("\", \"", ActionNames()) + "\"";
         }
 
         /// <summary>Convenience for declaring actions inline.</summary>

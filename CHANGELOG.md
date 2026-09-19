@@ -8,6 +8,15 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 First public release.
 
+### Compatibility
+
+- **Supported target: Unity 2022.3.** The Editor worker, the command surface and the file protocol
+  were designed and verified against that version, and the package manifest requires `2022.3`.
+- **Unity 6 is out of scope by decision, not by oversight.** Projects on Unity 6 should use the
+  command line tooling Unity provides for that generation instead. See the Compatibility section of
+  the README.
+- The 2021.3 LTS line is untested; it is no longer accepted by the package manifest.
+
 ### Added
 
 **Transport and worker**
@@ -56,6 +65,17 @@ First public release.
   synthesised input; recording; screenshots; player builds; Package Manager; C# execution; runtime
   reflection.
 - Unity Test Framework suites as pollable async jobs.
+- `selftest`: the tool testing itself through its own queue.
+
+In total **32 Editor command groups carrying 402 actions**, plus 9 offline groups.
+
+**Self-verification**
+
+- `Tools/verify.ps1` — an offline build gate: manifest, `.meta` coverage, command contract, and a
+  Roslyn compile of the Editor sources without opening Unity.
+- `Tools/cucli-selftest.ps1`, driven by `cucli selftest` — a black-box behaviour gate that reads the
+  tool's own catalog and exercises every group through the real CLI, so it also covers project-local
+  extensions it has never seen.
 
 **Project-local extensions (self-iteration)**
 
