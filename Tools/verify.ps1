@@ -132,6 +132,56 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
     }
 }
 
+# ---------------------------------------------------------------- 1b. shipped catalog
+
+Write-Section '1b. shipped catalog'
+
+if (-not (Test-Path -LiteralPath $registryPath)) {
+    Add-Failure 'commands/registry.json is missing.'
+} else {
+    try {
+        $registry = [System.IO.File]::ReadAllText($registryPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+        $commandsDir = Join-Path $PackageRoot 'commands'
+        $names = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+        $groupCount = 0
+        $includeCount = 0
+        if ($registry.PSObject.Properties['includes'] -and $registry.includes) {
+            foreach ($relative in @($registry.includes)) {
+                $name = [string]$relative
+                if ([string]::IsNullOrWhiteSpace($name)) { continue }
+                $includeCount++
+                $includePath = Join-Path $commandsDir ($name -replace '/', [IO.Path]::DirectorySeparatorChar)
+                if (-not (Test-Path -LiteralPath $includePath)) {
+                    Add-Failure "registry include missing: $name"
+                    continue
+                }
+                $module = [System.IO.File]::ReadAllText($includePath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+                foreach ($group in @($module.groups)) {
+                    $groupCount++
+                    if ($group.name -and -not $names.Add([string]$group.name)) {
+                        Add-Failure "duplicate catalog group '$($group.name)'"
+                    }
+                }
+            }
+        }
+        if ($registry.PSObject.Properties['groups'] -and $registry.groups) {
+            foreach ($group in @($registry.groups)) {
+                $groupCount++
+                if ($group.name -and -not $names.Add([string]$group.name)) {
+                    Add-Failure "duplicate catalog group '$($group.name)'"
+                }
+            }
+        }
+        if ($groupCount -eq 0) {
+            Add-Failure 'shipped catalog declares no command groups (includes and inline groups are empty).'
+        } elseif ($failures.Count -eq 0) {
+            Add-Pass "shipped catalog lists $groupCount group(s) across $includeCount module file(s)."
+        }
+    } catch {
+        Add-Failure "commands/registry.json is not valid JSON: $($_.Exception.Message)"
+    }
+}
+
 # ---------------------------------------------------------------- 2. meta coverage
 
 Write-Section '2. meta coverage'

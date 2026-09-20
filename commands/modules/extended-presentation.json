@@ -1,0 +1,1432 @@
+{
+  "schemaVersion": "cucli.command-registry-module/v1",
+  "module": "extended-presentation",
+  "groups": [
+    {
+      "name": "animation",
+      "summary": "Animation clips (curves, events, presets), AnimatorControllers (states, transitions, parameters, layers, blend trees) and Animator runtime control.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "project.assets.read",
+        "scene.animator.write"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "clip_create",
+          "summary": "Create an AnimationClip asset."
+        },
+        {
+          "name": "clip_get_info",
+          "summary": "Read the clip settings, curve bindings and events with bounded keyframe counts."
+        },
+        {
+          "name": "clip_add_curve",
+          "summary": "Append keyframes to a float curve."
+        },
+        {
+          "name": "clip_set_curve",
+          "summary": "Replace a float curve."
+        },
+        {
+          "name": "clip_set_vector_curve",
+          "summary": "Write the three component curves of a vector property."
+        },
+        {
+          "name": "clip_assign",
+          "summary": "Assign the clip to an Animator."
+        },
+        {
+          "name": "clip_add_event",
+          "summary": "Append an AnimationEvent."
+        },
+        {
+          "name": "clip_remove_event",
+          "summary": "Remove AnimationEvents by index or by function name."
+        },
+        {
+          "name": "clip_create_preset",
+          "summary": "Generate a clip from one of the fifteen procedural presets."
+        },
+        {
+          "name": "controller_create",
+          "summary": "Create an AnimatorController asset."
+        },
+        {
+          "name": "controller_add_state",
+          "summary": "Add a state to a layer, optionally with a motion clip."
+        },
+        {
+          "name": "controller_add_transition",
+          "summary": "Add a transition, including from AnyState."
+        },
+        {
+          "name": "controller_add_parameter",
+          "summary": "Add a controller parameter."
+        },
+        {
+          "name": "controller_get_info",
+          "summary": "Read layers, states, transitions and parameters."
+        },
+        {
+          "name": "controller_assign",
+          "summary": "Assign the controller to an Animator."
+        },
+        {
+          "name": "controller_add_layer",
+          "summary": "Append a layer with a weight and blending mode."
+        },
+        {
+          "name": "controller_remove_layer",
+          "summary": "Remove a layer by index or name."
+        },
+        {
+          "name": "controller_set_layer_weight",
+          "summary": "Set one layer weight."
+        },
+        {
+          "name": "controller_create_blend_tree_1d",
+          "summary": "Create a 1D blend tree state."
+        },
+        {
+          "name": "controller_create_blend_tree_2d",
+          "summary": "Create a 2D blend tree state."
+        },
+        {
+          "name": "controller_add_blend_tree_child",
+          "summary": "Add a motion child to a blend tree."
+        },
+        {
+          "name": "animator_get_info",
+          "summary": "Read the Animator state, parameters, layers and clips."
+        },
+        {
+          "name": "animator_get_parameter",
+          "summary": "Read one Animator parameter."
+        },
+        {
+          "name": "animator_play",
+          "summary": "Play a state by name. Requires Play Mode."
+        },
+        {
+          "name": "animator_crossfade",
+          "summary": "Cross-fade to a state. Requires Play Mode."
+        },
+        {
+          "name": "animator_set_parameter",
+          "summary": "Write one Animator parameter."
+        },
+        {
+          "name": "animator_set_speed",
+          "summary": "Set the Animator speed."
+        },
+        {
+          "name": "animator_set_enabled",
+          "summary": "Enable or disable the Animator component."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "clip_create",
+              "clip_get_info",
+              "clip_add_curve",
+              "clip_set_curve",
+              "clip_set_vector_curve",
+              "clip_assign",
+              "clip_add_event",
+              "clip_remove_event",
+              "clip_create_preset",
+              "controller_create",
+              "controller_add_state",
+              "controller_add_transition",
+              "controller_add_parameter",
+              "controller_get_info",
+              "controller_assign",
+              "controller_add_layer",
+              "controller_remove_layer",
+              "controller_set_layer_weight",
+              "controller_create_blend_tree_1d",
+              "controller_create_blend_tree_2d",
+              "controller_add_blend_tree_child",
+              "animator_get_info",
+              "animator_get_parameter",
+              "animator_play",
+              "animator_crossfade",
+              "animator_set_parameter",
+              "animator_set_speed",
+              "animator_set_enabled"
+            ],
+            "default": "clip_create"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Parameter envelope; its keys are merged with the outer keys, and outer keys win."
+          },
+          "clipPath": {
+            "type": "string",
+            "description": "AnimationClip asset path; '.anim' is appended when missing."
+          },
+          "controllerPath": {
+            "type": "string",
+            "description": "AnimatorController asset path; '.controller' is appended when missing."
+          },
+          "name": {
+            "type": "string",
+            "description": "action=clip_create: clip name, defaulting to the file name."
+          },
+          "length": {
+            "type": "number",
+            "default": 1,
+            "description": "action=clip_create: stop time."
+          },
+          "frameRate": {
+            "type": "number",
+            "default": 60,
+            "description": "action=clip_create: clip frame rate."
+          },
+          "loop": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=clip_create / clip_create_preset: circular clip."
+          },
+          "propertyPath": {
+            "type": "string",
+            "description": "action=clip_add_curve / clip_set_curve: e.g. localPosition.x."
+          },
+          "property": {
+            "type": "string",
+            "enum": [
+              "localPosition",
+              "localEulerAngles",
+              "localScale"
+            ],
+            "description": "action=clip_set_vector_curve."
+          },
+          "relativePath": {
+            "type": "string",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "default": "Transform",
+            "description": "action=clip_* curve: the bound component type."
+          },
+          "keys": {
+            "type": "array",
+            "items": {},
+            "description": "action=clip_*: [time, value] pairs or {time, value, inTangent, outTangent, inWeight, outWeight} objects."
+          },
+          "target": {
+            "type": "string",
+            "description": "action=clip_assign / controller_assign / animator_*: GameObject name, path or instance id."
+          },
+          "searchMethod": {
+            "type": "string",
+            "enum": [
+              "by_id_or_name_or_path",
+              "by_id",
+              "by_name",
+              "by_path"
+            ]
+          },
+          "time": {
+            "type": "number",
+            "description": "action=clip_add_event: event time; clip_remove_event: optional filter."
+          },
+          "functionName": {
+            "type": "string",
+            "description": "action=clip_add_event / clip_remove_event: the event callback name."
+          },
+          "stringParameter": {
+            "type": "string",
+            "default": ""
+          },
+          "floatParameter": {
+            "type": "number",
+            "default": 0
+          },
+          "intParameter": {
+            "type": "integer",
+            "default": 0
+          },
+          "eventIndex": {
+            "type": "integer",
+            "description": "action=clip_remove_event: index, preferred over functionName."
+          },
+          "preset": {
+            "type": "string",
+            "enum": [
+              "bounce",
+              "rotate",
+              "pulse",
+              "fade",
+              "shake",
+              "hover",
+              "spin",
+              "sway",
+              "bob",
+              "wiggle",
+              "blink",
+              "slide_in",
+              "elastic",
+              "grow",
+              "shrink"
+            ],
+            "description": "action=clip_create_preset."
+          },
+          "duration": {
+            "type": "number",
+            "default": 1
+          },
+          "amplitude": {
+            "type": "number",
+            "default": 1
+          },
+          "offset": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "action=clip_create_preset: [x,y,z] base offset."
+          },
+          "stateName": {
+            "type": "string"
+          },
+          "layerIndex": {
+            "type": "integer",
+            "default": 0
+          },
+          "layerName": {
+            "type": "string"
+          },
+          "speed": {
+            "type": "number",
+            "default": 1
+          },
+          "isDefault": {
+            "type": "boolean",
+            "default": false
+          },
+          "fromState": {
+            "type": "string",
+            "description": "action=controller_add_transition; AnyState / Any enable an AnyState transition."
+          },
+          "toState": {
+            "type": "string"
+          },
+          "hasExitTime": {
+            "type": "boolean",
+            "default": true
+          },
+          "exitTime": {
+            "type": "number",
+            "default": 0.75
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "parameterName": {
+            "type": "string"
+          },
+          "parameterType": {
+            "type": "string",
+            "enum": [
+              "float",
+              "int",
+              "integer",
+              "bool",
+              "boolean",
+              "trigger"
+            ]
+          },
+          "defaultValue": {
+            "description": "action=controller_add_parameter: number, integer or bool."
+          },
+          "weight": {
+            "type": "number",
+            "default": 1
+          },
+          "blendingMode": {
+            "type": "string",
+            "enum": [
+              "override",
+              "additive"
+            ]
+          },
+          "blendParameter": {
+            "type": "string"
+          },
+          "blendParameterX": {
+            "type": "string"
+          },
+          "blendParameterY": {
+            "type": "string"
+          },
+          "blendType": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "number"
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "layer": {
+            "type": "integer",
+            "default": -1,
+            "description": "action=animator_play / animator_crossfade: Animator layer index; -1 means the current layer."
+          },
+          "value": {
+            "description": "action=animator_set_parameter."
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 100
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "camera",
+      "summary": "Inspect, create and drive Cameras; Cinemachine brains, bodies, aims, noise, extensions and blends; screenshots.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "scene.camera.write",
+        "scene.camera.read"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Report whether Cinemachine is installed and how many cameras the scene has."
+        },
+        {
+          "name": "create_camera",
+          "summary": "Create a Camera; with Cinemachine installed the Cinemachine path is used."
+        },
+        {
+          "name": "set_target",
+          "summary": "Set the follow and look-at target of a Camera or Cinemachine camera."
+        },
+        {
+          "name": "set_lens",
+          "summary": "Set field of view, clip planes, orthographic size and Dutch."
+        },
+        {
+          "name": "set_priority",
+          "summary": "Set Cinemachine priority, or Camera.depth on a basic camera."
+        },
+        {
+          "name": "list_cameras",
+          "summary": "List the brain, the Cinemachine cameras and the Unity cameras."
+        },
+        {
+          "name": "screenshot",
+          "summary": "Render one camera view to a PNG under Assets/Docs~."
+        },
+        {
+          "name": "screenshot_multiview",
+          "summary": "Render the six surround views around a target as PNGs."
+        },
+        {
+          "name": "ensure_brain",
+          "summary": "Create a CinemachineBrain on a camera when it has none."
+        },
+        {
+          "name": "get_brain_status",
+          "summary": "Report the active Cinemachine camera and blend state."
+        },
+        {
+          "name": "set_body",
+          "summary": "Replace or configure the Cinemachine Body stage component."
+        },
+        {
+          "name": "set_aim",
+          "summary": "Replace or configure the Cinemachine Aim stage component."
+        },
+        {
+          "name": "set_noise",
+          "summary": "Add or configure the Cinemachine noise component."
+        },
+        {
+          "name": "add_extension",
+          "summary": "Attach a CinemachineExtension by type name."
+        },
+        {
+          "name": "remove_extension",
+          "summary": "Remove every CinemachineExtension of a type."
+        },
+        {
+          "name": "set_blend",
+          "summary": "Set the Cinemachine default blend style and duration."
+        },
+        {
+          "name": "force_camera",
+          "summary": "Force a Cinemachine camera live through an override or by priority."
+        },
+        {
+          "name": "release_override",
+          "summary": "Release the active Cinemachine camera override."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "create_camera",
+              "set_target",
+              "set_lens",
+              "set_priority",
+              "list_cameras",
+              "screenshot",
+              "screenshot_multiview",
+              "ensure_brain",
+              "get_brain_status",
+              "set_body",
+              "set_aim",
+              "set_noise",
+              "add_extension",
+              "remove_extension",
+              "set_blend",
+              "force_camera",
+              "release_override"
+            ],
+            "default": "ping"
+          },
+          "target": {
+            "type": "string",
+            "description": "Camera or Cinemachine camera: name, hierarchy path or instance id; 'main' selects Camera.main."
+          },
+          "tag": {
+            "type": "string",
+            "description": "Select the camera by GameObject tag, e.g. MainCamera."
+          },
+          "searchMethod": {
+            "type": "string",
+            "enum": [
+              "by_id_or_name_or_path",
+              "by_id",
+              "by_name",
+              "by_path",
+              "by_tag"
+            ]
+          },
+          "properties": {
+            "type": "object",
+            "description": "Operation payload; nested keys are read exactly as documented."
+          },
+          "name": {
+            "type": "string",
+            "description": "action=create_camera: new GameObject name."
+          },
+          "preset": {
+            "type": "string",
+            "enum": [
+              "follow",
+              "third_person",
+              "freelook",
+              "dolly",
+              "static",
+              "top_down",
+              "side_scroller"
+            ],
+            "description": "action=create_camera with Cinemachine."
+          },
+          "fieldOfView": {
+            "type": "number",
+            "description": "action=create_camera / set_lens."
+          },
+          "nearClipPlane": {
+            "type": "number",
+            "description": "action=create_camera / set_lens."
+          },
+          "farClipPlane": {
+            "type": "number",
+            "description": "action=create_camera / set_lens."
+          },
+          "orthographicSize": {
+            "type": "number",
+            "description": "action=set_lens."
+          },
+          "priority": {
+            "type": "number",
+            "description": "action=create_camera / set_priority."
+          },
+          "viewTarget": {
+            "type": "string",
+            "description": "action=create_camera / screenshot: look-at or orbit centre object."
+          },
+          "camera": {
+            "type": "string",
+            "description": "action=screenshot: camera name, path or instance id. Forbidden with captureSource=scene_view."
+          },
+          "captureSource": {
+            "type": "string",
+            "enum": [
+              "game_view",
+              "scene_view"
+            ],
+            "default": "game_view"
+          },
+          "width": {
+            "type": "integer",
+            "default": 1920,
+            "description": "action=screenshot: output width."
+          },
+          "height": {
+            "type": "integer",
+            "default": 1080,
+            "description": "action=screenshot: output height."
+          },
+          "superSize": {
+            "type": "integer",
+            "default": 1,
+            "description": "action=screenshot: supersampling multiplier."
+          },
+          "includeImage": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=screenshot: inline base64 PNG."
+          },
+          "maxResolution": {
+            "type": "integer",
+            "default": 640,
+            "description": "action=screenshot: longest side of the inlined image."
+          },
+          "filename": {
+            "type": "string",
+            "description": "action=screenshot: output file name; '.png' is appended when missing."
+          },
+          "outputFolder": {
+            "type": "string",
+            "description": "action=screenshot: output folder; defaults to Assets/Docs~/."
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "action=screenshot_multiview: unused, kept for parity with the surface."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=screenshot: overwrite an existing file."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 32
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 2
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 100
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "description": "action=screenshot: wait cap for the capture."
+          }
+        }
+      }
+    },
+    {
+      "name": "graphics",
+      "summary": "Render pipeline settings, skybox/ambient/fog/reflection environment, light baking, renderer features and rendering statistics.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "project.settings.write",
+        "project.lightmaps.write",
+        "scene.render.write"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Report the active pipeline, Volume and URP feature availability, and the effect count."
+        },
+        {
+          "name": "volume_create",
+          "summary": "Create a Volume GameObject, optionally with a VolumeProfile asset and initial effects."
+        },
+        {
+          "name": "volume_add_effect",
+          "summary": "Add a VolumeComponent to the volume profile."
+        },
+        {
+          "name": "volume_set_effect",
+          "summary": "Write parameters onto one VolumeComponent and mark them overridden."
+        },
+        {
+          "name": "volume_remove_effect",
+          "summary": "Remove a VolumeComponent from the volume profile."
+        },
+        {
+          "name": "volume_get_info",
+          "summary": "Read the volume state and its effects."
+        },
+        {
+          "name": "volume_set_properties",
+          "summary": "Set weight, priority, isGlobal and blendDistance on a Volume."
+        },
+        {
+          "name": "volume_list_effects",
+          "summary": "List every VolumeComponent type available in the active pipeline."
+        },
+        {
+          "name": "volume_create_profile",
+          "summary": "Create a VolumeProfile .asset at a path."
+        },
+        {
+          "name": "bake_start",
+          "summary": "Start a lightmap bake and wait for it to finish."
+        },
+        {
+          "name": "bake_cancel",
+          "summary": "Cancel a running lightmap bake."
+        },
+        {
+          "name": "bake_status",
+          "summary": "Report whether a bake is running plus the GI and lightmap counts."
+        },
+        {
+          "name": "bake_clear",
+          "summary": "Discard the baked lightmap data."
+        },
+        {
+          "name": "bake_reflection_probe",
+          "summary": "Bake one reflection probe to Assets/Lightmaps and wait for it to finish."
+        },
+        {
+          "name": "bake_get_settings",
+          "summary": "Read the lightmap settings of the active LightingSettings asset."
+        },
+        {
+          "name": "bake_set_settings",
+          "summary": "Write lightmap settings onto the active LightingSettings asset."
+        },
+        {
+          "name": "bake_create_light_probe_group",
+          "summary": "Create a LightProbeGroup with a probe grid."
+        },
+        {
+          "name": "bake_create_reflection_probe",
+          "summary": "Create a ReflectionProbe with mode, resolution and bounds."
+        },
+        {
+          "name": "bake_set_probe_positions",
+          "summary": "Replace the probe positions of a LightProbeGroup."
+        },
+        {
+          "name": "stats_get",
+          "summary": "Read the rendering statistics of the last frame."
+        },
+        {
+          "name": "stats_list_counters",
+          "summary": "List the Profiler counters of one category."
+        },
+        {
+          "name": "stats_set_scene_debug",
+          "summary": "Set the Scene view draw mode."
+        },
+        {
+          "name": "stats_get_memory",
+          "summary": "Read texture, mesh and managed memory totals."
+        },
+        {
+          "name": "pipeline_get_info",
+          "summary": "Report the active pipeline, quality level, colour space and pipeline settings."
+        },
+        {
+          "name": "pipeline_set_quality",
+          "summary": "Set the active quality level by name or index."
+        },
+        {
+          "name": "pipeline_get_settings",
+          "summary": "Read the public and serialized properties of the pipeline asset."
+        },
+        {
+          "name": "pipeline_set_settings",
+          "summary": "Write properties onto the pipeline asset by property or m_Xxx path."
+        },
+        {
+          "name": "feature_list",
+          "summary": "List the renderer features of one URP renderer."
+        },
+        {
+          "name": "feature_add",
+          "summary": "Add a ScriptableRendererFeature to a URP renderer."
+        },
+        {
+          "name": "feature_remove",
+          "summary": "Remove a renderer feature by index or name."
+        },
+        {
+          "name": "feature_configure",
+          "summary": "Write serialized properties onto a renderer feature."
+        },
+        {
+          "name": "feature_toggle",
+          "summary": "Enable or disable a renderer feature."
+        },
+        {
+          "name": "feature_reorder",
+          "summary": "Reorder the renderer features of one renderer."
+        },
+        {
+          "name": "skybox_get",
+          "summary": "Read the skybox material, ambient, fog, reflection and sun settings."
+        },
+        {
+          "name": "skybox_set_material",
+          "summary": "Assign the skybox material."
+        },
+        {
+          "name": "skybox_set_properties",
+          "summary": "Write properties onto the skybox material."
+        },
+        {
+          "name": "skybox_set_ambient",
+          "summary": "Set the ambient mode, colours and intensity."
+        },
+        {
+          "name": "skybox_set_fog",
+          "summary": "Set the fog mode, colour, density and distances."
+        },
+        {
+          "name": "skybox_set_reflection",
+          "summary": "Set the reflection intensity, bounces, mode and cubemap."
+        },
+        {
+          "name": "skybox_set_sun",
+          "summary": "Assign the sun used by the skybox."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "volume_create",
+              "volume_add_effect",
+              "volume_set_effect",
+              "volume_remove_effect",
+              "volume_get_info",
+              "volume_set_properties",
+              "volume_list_effects",
+              "volume_create_profile",
+              "bake_start",
+              "bake_cancel",
+              "bake_status",
+              "bake_clear",
+              "bake_reflection_probe",
+              "bake_get_settings",
+              "bake_set_settings",
+              "bake_create_light_probe_group",
+              "bake_create_reflection_probe",
+              "bake_set_probe_positions",
+              "stats_get",
+              "stats_list_counters",
+              "stats_set_scene_debug",
+              "stats_get_memory",
+              "pipeline_get_info",
+              "pipeline_set_quality",
+              "pipeline_get_settings",
+              "pipeline_set_settings",
+              "feature_list",
+              "feature_add",
+              "feature_remove",
+              "feature_configure",
+              "feature_toggle",
+              "feature_reorder",
+              "skybox_get",
+              "skybox_set_material",
+              "skybox_set_properties",
+              "skybox_set_ambient",
+              "skybox_set_fog",
+              "skybox_set_reflection",
+              "skybox_set_sun"
+            ],
+            "default": "ping"
+          },
+          "name": {
+            "type": "string",
+            "description": "New object or feature name; also a target fallback for bake_probe and skybox_set_sun."
+          },
+          "target": {
+            "type": "string",
+            "description": "Volume or GameObject name / instance id."
+          },
+          "isGlobal": {
+            "type": "boolean",
+            "default": true,
+            "description": "action=volume_create / volume_set_properties."
+          },
+          "weight": {
+            "type": "number",
+            "default": 1.0,
+            "description": "action=volume_create / volume_set_properties."
+          },
+          "priority": {
+            "type": "number",
+            "default": 0.0,
+            "description": "action=volume_create / volume_set_properties."
+          },
+          "blendDistance": {
+            "type": "number",
+            "description": "action=volume_set_properties."
+          },
+          "profilePath": {
+            "type": "string",
+            "description": "action=volume_create: VolumeProfile asset path; '(embedded)' when omitted."
+          },
+          "path": {
+            "type": "string",
+            "description": "action=volume_create_profile / skybox_set_material / skybox_set_reflection."
+          },
+          "materialPath": {
+            "type": "string",
+            "description": "action=skybox_set_material fallback key."
+          },
+          "cubemapPath": {
+            "type": "string",
+            "description": "action=skybox_set_reflection fallback key."
+          },
+          "effect": {
+            "type": "string",
+            "description": "action=volume_add_effect / volume_set_effect / volume_remove_effect: VolumeComponent type name."
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "action=volume_create: [{ type, parameters }] applied after creation."
+          },
+          "parameters": {
+            "type": "object",
+            "description": "action=volume_set_effect / skybox_set_properties: field name to value."
+          },
+          "properties": {
+            "type": "object",
+            "description": "action=volume_set_properties / feature_add / feature_configure / skybox_set_properties."
+          },
+          "settings": {
+            "type": "object",
+            "description": "action=bake_set_settings / pipeline_set_settings / feature_configure."
+          },
+          "async": {
+            "type": "boolean",
+            "default": true,
+            "description": "action=bake_start: Lightmapping.BakeAsync versus Bake."
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "action=bake_start / bake_reflection_probe wait cap."
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "action=bake_create_*: [x,y,z]."
+          },
+          "gridSize": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "action=bake_create_light_probe_group: [x,y,z] grid, default [3,2,3]."
+          },
+          "spacing": {
+            "type": "number",
+            "default": 2.0,
+            "description": "action=bake_create_light_probe_group."
+          },
+          "size": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "action=bake_create_reflection_probe: bounds size, default [10,10,10]."
+          },
+          "resolution": {
+            "type": "integer",
+            "default": 256,
+            "description": "action=bake_create_reflection_probe / skybox_set_reflection."
+          },
+          "mode": {
+            "type": "string",
+            "description": "action=bake_create_reflection_probe / stats_set_scene_debug / skybox_set_*."
+          },
+          "hdr": {
+            "type": "boolean",
+            "default": true,
+            "description": "action=bake_create_reflection_probe."
+          },
+          "boxProjection": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=bake_create_reflection_probe."
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "description": "action=bake_set_probe_positions: [[x,y,z], ...]."
+          },
+          "category": {
+            "type": "string",
+            "default": "Render",
+            "description": "action=stats_list_counters: Profiler category name."
+          },
+          "level": {
+            "type": "string",
+            "description": "action=pipeline_set_quality: quality level name or index."
+          },
+          "rendererIndex": {
+            "type": "integer",
+            "description": "action=feature_*: index into the URP renderer data list."
+          },
+          "type": {
+            "type": "string",
+            "description": "action=feature_add: ScriptableRendererFeature type name."
+          },
+          "material": {
+            "type": "string",
+            "description": "action=feature_add / skybox_set_material: material asset path."
+          },
+          "index": {
+            "type": "integer",
+            "description": "action=feature_remove / feature_configure / feature_toggle."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "action=feature_toggle."
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "action=feature_reorder: a permutation of 0..N-1."
+          },
+          "color": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "action=skybox_set_ambient / skybox_set_fog."
+          },
+          "skyColor": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "equatorColor": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "groundColor": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ambientMode": {
+            "type": "string",
+            "description": "action=skybox_set_ambient: Skybox / Trilight / Flat / Custom."
+          },
+          "intensity": {
+            "type": "number",
+            "description": "action=skybox_set_ambient / skybox_set_reflection."
+          },
+          "fogEnabled": {
+            "type": "boolean",
+            "description": "action=skybox_set_fog."
+          },
+          "fogMode": {
+            "type": "string",
+            "description": "action=skybox_set_fog: Linear / Exponential / ExponentialSquared."
+          },
+          "fogColor": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "fogDensity": {
+            "type": "number",
+            "description": "action=skybox_set_fog."
+          },
+          "fogStart": {
+            "type": "number",
+            "description": "action=skybox_set_fog."
+          },
+          "fogEnd": {
+            "type": "number",
+            "description": "action=skybox_set_fog."
+          },
+          "bounces": {
+            "type": "integer",
+            "description": "action=skybox_set_reflection."
+          },
+          "reflectionMode": {
+            "type": "string",
+            "description": "action=skybox_set_reflection: Skybox / Custom."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "action=skybox_set_fog fallback key."
+          },
+          "start": {
+            "type": "number",
+            "description": "action=skybox_set_fog fallback key."
+          },
+          "end": {
+            "type": "number",
+            "description": "action=skybox_set_fog fallback key."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 100
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "ui",
+      "summary": "UI Toolkit work: UXML/USS files, UIDocument wiring, PanelSettings and VisualElement editing (no uGUI, no RectTransform).",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "project.assets.read",
+        "project.assets.delete",
+        "ui.visualtree.write"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Round-trip probe reporting UI Toolkit availability and asset counts."
+        },
+        {
+          "name": "create",
+          "summary": "Create a .uxml or .uss file. Fails when the file already exists."
+        },
+        {
+          "name": "read",
+          "summary": "Read a .uxml or .uss file as text, optionally base64 encoded."
+        },
+        {
+          "name": "update",
+          "summary": "Overwrite an existing .uxml or .uss file."
+        },
+        {
+          "name": "attach_ui_document",
+          "summary": "Attach or update a UIDocument on a GameObject: visualTreeAsset, panelSettings, sortingOrder."
+        },
+        {
+          "name": "create_panel_settings",
+          "summary": "Create a PanelSettings .asset with scale mode, reference resolution and sorting order."
+        },
+        {
+          "name": "update_panel_settings",
+          "summary": "Write properties onto an existing PanelSettings .asset."
+        },
+        {
+          "name": "get_visual_tree",
+          "summary": "Dump the UIDocument visual tree, depth limited and item limited."
+        },
+        {
+          "name": "render_ui",
+          "summary": "Render the panel to a PNG under Assets/Docs~ and register it as an artifact."
+        },
+        {
+          "name": "link_stylesheet",
+          "summary": "Insert a <Style src=...> reference for a USS asset into a UXML file."
+        },
+        {
+          "name": "delete",
+          "summary": "Delete a .uxml or .uss file. Requires force."
+        },
+        {
+          "name": "list",
+          "summary": "List UXML, USS and PanelSettings assets, paged."
+        },
+        {
+          "name": "detach_ui_document",
+          "summary": "Clear the UIDocument source asset on a GameObject."
+        },
+        {
+          "name": "modify_visual_element",
+          "summary": "Set text, inline style, USS classes, enabled/visible and tooltip on a named element."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "create",
+              "read",
+              "update",
+              "attach_ui_document",
+              "create_panel_settings",
+              "update_panel_settings",
+              "get_visual_tree",
+              "render_ui",
+              "link_stylesheet",
+              "delete",
+              "list",
+              "detach_ui_document",
+              "modify_visual_element"
+            ],
+            "default": "ping"
+          },
+          "path": {
+            "type": "string",
+            "description": "UXML/USS path for create/read/update/delete/link_stylesheet, .asset path for create_panel_settings/update_panel_settings, search folder for list."
+          },
+          "contents": {
+            "type": "string",
+            "description": "action=create / update: full file text."
+          },
+          "encodedContents": {
+            "type": "string",
+            "description": "action=create / update: base64 file contents."
+          },
+          "contentsEncoded": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create / update: decode encodedContents as base64."
+          },
+          "target": {
+            "type": "string",
+            "description": "GameObject name, hierarchy path or instance id hosting the UIDocument."
+          },
+          "sourceAsset": {
+            "type": "string",
+            "description": "action=attach_ui_document: UXML asset path."
+          },
+          "panelSettings": {
+            "type": "string",
+            "description": "action=attach_ui_document: PanelSettings asset path."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "default": 0,
+            "description": "action=attach_ui_document: UIDocument.sortingOrder."
+          },
+          "settings": {
+            "type": "object",
+            "description": "action=create_panel_settings / update_panel_settings: PanelSettings property dictionary."
+          },
+          "scaleMode": {
+            "type": "string",
+            "description": "action=create_panel_settings: PanelScaleMode name."
+          },
+          "referenceResolution": {
+            "type": "object",
+            "description": "action=create_panel_settings: { width, height }."
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 10,
+            "description": "action=get_visual_tree: serialisation depth cap."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64,
+            "description": "action=get_visual_tree: element budget."
+          },
+          "maxStringLength": {
+            "type": "integer",
+            "default": 4096
+          },
+          "width": {
+            "type": "integer",
+            "default": 1920,
+            "description": "action=render_ui: output width."
+          },
+          "height": {
+            "type": "integer",
+            "default": 1080,
+            "description": "action=render_ui: output height."
+          },
+          "includeImage": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=render_ui: inline base64 PNG."
+          },
+          "maxResolution": {
+            "type": "integer",
+            "default": 640,
+            "description": "action=render_ui: longest side of the inlined image."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "action=render_ui: output file name; '.png' is appended when missing."
+          },
+          "outputFolder": {
+            "type": "string",
+            "description": "action=render_ui: output folder; defaults to Assets/Docs~/."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=render_ui / delete: overwrite or confirm a destructive change."
+          },
+          "stylesheet": {
+            "type": "string",
+            "description": "action=link_stylesheet: USS asset path."
+          },
+          "filterType": {
+            "type": "string",
+            "enum": [
+              "",
+              "uxml",
+              "VisualTreeAsset",
+              "uss",
+              "StyleSheet",
+              "PanelSettings"
+            ],
+            "description": "action=list: asset type filter."
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 50
+          },
+          "pageNumber": {
+            "type": "integer",
+            "default": 1
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "elementName": {
+            "type": "string",
+            "description": "action=modify_visual_element: UXML name attribute, resolved with rootVisualElement.Q(name)."
+          },
+          "text": {
+            "type": "string",
+            "description": "action=modify_visual_element: TextElement text; errors on a non-TextElement."
+          },
+          "addClasses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removeClasses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "toggleClasses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "style": {
+            "type": "object",
+            "description": "action=modify_visual_element: inline style dictionary (camelCase or kebab-case keys)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "action=modify_visual_element: element.SetEnabled(value)."
+          },
+          "visible": {
+            "type": "string",
+            "description": "action=modify_visual_element: 'true'/'1' maps to display=Flex, anything else to display=None."
+          },
+          "tooltip": {
+            "type": "string",
+            "description": "action=modify_visual_element: element.tooltip."
+          }
+        }
+      }
+    }
+  ]
+}

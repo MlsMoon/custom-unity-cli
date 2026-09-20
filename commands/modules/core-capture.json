@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "cucli.command-registry-module/v1",
+  "module": "core-capture",
+  "groups": [
+    {
+      "name": "capture",
+      "summary": "Capture the game view, the Scene view or a six-angle surround sheet to PNG, with an optional inlined image.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "filesystem.write",
+        "editor.frame.read"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "game",
+          "summary": "Capture what a camera renders. Add --include-ui for the overlay-composited game view image."
+        },
+        {
+          "name": "scene-view",
+          "summary": "Render the Scene view camera on demand and restore its render target afterwards."
+        },
+        {
+          "name": "multiview",
+          "summary": "Frame the subject from six axis directions (surround), one PNG per angle."
+        },
+        {
+          "name": "list",
+          "summary": "List the images this session produced, plus capture folders under Assets/Docs~."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "game",
+              "scene-view",
+              "multiview",
+              "list"
+            ],
+            "default": "game"
+          },
+          "outputFolder": {
+            "type": "string",
+            "description": "Project-relative folder under Assets/. Default Assets/Docs~."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Bare file name for a single capture; must not contain a path."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "File name prefix when no filename is given."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "Overwrite an existing file instead of failing with ASSET_EXISTS."
+          },
+          "target": {
+            "type": "string",
+            "description": "Camera name or instance id. Defaults to Camera.main, then the first enabled non-Scene-view camera."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8192
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8192
+          },
+          "superSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 1
+          },
+          "includeUI": {
+            "type": "boolean",
+            "default": false,
+            "description": "game: composite the overlay UI too. Requires Play Mode and waits for the end of a frame."
+          },
+          "includeImage": {
+            "type": "boolean",
+            "default": false,
+            "description": "Inline a base64 PNG in the response."
+          },
+          "maxResolution": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 4096,
+            "default": 640,
+            "description": "Cap applied before an image is inlined."
+          },
+          "batch": {
+            "type": "string",
+            "enum": [
+              "surround",
+              "orbit"
+            ],
+            "default": "surround",
+            "description": "multiview: orbit is not implemented and reports so."
+          },
+          "targetObject": {
+            "type": "string",
+            "description": "multiview: object whose bounds frame the shots. Defaults to all enabled renderers."
+          },
+          "distance": {
+            "type": "number",
+            "default": 2.2,
+            "description": "multiview: camera distance as a multiple of the subject radius."
+          },
+          "resolution": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096,
+            "default": 512,
+            "description": "multiview: square resolution per angle."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          }
+        }
+      }
+    }
+  ]
+}

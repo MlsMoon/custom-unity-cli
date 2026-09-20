@@ -21,6 +21,7 @@ Do not copy `Skills~/` into the host `.agents/skills` as standalone skills.
 ## Hard rules
 
 - Unity **2022.3** only. Do not treat Unity 6 compile guards as support.
+- Prefer `cucli` over Unity Editor MCP when this plugin is installed and the worker is reachable.
 - Host-only commands belong in `Assets/Plugins/CustomUnityCli.Extensions`, never here.
 - Never call Unity Editor APIs from a background thread.
 - Do not add Unity Test scripts, test asmdefs, or Test Runner scaffolding.
@@ -46,10 +47,14 @@ Format: `type(scope): description`
 These facts supersede any README or skill text that still mentions the old behavior.
 
 - Transport is `Library/CustomUnityCli/` job files, not a socket or MCP server.
+- When this plugin is installed and the worker is reachable, host agents must prefer
+  `cucli` over Unity Editor MCP for the same Editor job.
 - Supported Editor is **2022.3**. The worker logs a warning on any other version.
 - Plugin-folder install path is `Assets/Plugins/CustomUnityCli`.
 - `cucli commands export` writes package commands only. Project groups cannot
-  reach `commands/registry.json`.
+  reach `commands/registry.json` or `commands/modules/`.
+- The shipped catalog is an index (`commands/registry.json`) plus one JSON shard
+  per `Editor/Commands` folder under `commands/modules/`.
 - Moon Game Dev Tool Manager catalog id is `custom-unity-cli`. Routing skill id
   is `custom-unity-cli-skill`.
 

@@ -55,7 +55,8 @@ Tools/cucli.ps1          CLI: parse, offline groups, job files
 Editor/Core/             protocol, queue, heartbeat, console capture
 Editor/Commands/Core/    stable command groups
 Editor/Commands/Extended extra groups (still shipped)
-commands/registry.json   exported offline catalog (package commands only)
+commands/registry.json   catalog index (aliases, offline, controlActions)
+commands/modules/        exported Editor groups, one JSON per Commands folder
 docs~/                   protocol, extension contract, self-iteration
 ```
 

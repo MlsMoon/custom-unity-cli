@@ -7,7 +7,8 @@ job cancellation, captured console history, compile waiting across a domain relo
 diagnosis, and a stable exit-code contract.
 
 The two can coexist in one project. `cucli` does not reference, wrap or depend on `unity-mcp`; it is
-a parallel implementation, not a shim.
+a parallel implementation, not a shim. When both are installed and the worker is reachable, host
+agents must prefer `cucli` and not start or call Unity Editor MCP for the same job.
 
 ## Why the shape differs
 

@@ -10,10 +10,10 @@ namespace CustomUnityCli.Editor
     /// <summary>
     /// <c>cucli meta ...</c> - self-description and self-maintenance of the tool itself.
     ///
-    /// The important action is <c>export-registry</c>: it regenerates the shipped static
-    /// <c>commands/registry.json</c> from the commands actually compiled in this Editor, so the CLI
-    /// can list and validate commands while Unity is closed without anybody hand-maintaining a
-    /// second copy of the command surface.
+    /// The important action is <c>export-registry</c>: it regenerates the shipped static catalog
+    /// (<c>commands/registry.json</c> plus <c>commands/modules/*.json</c>) from the commands
+    /// actually compiled in this Editor, so the CLI can list and validate commands while Unity is
+    /// closed without anybody hand-maintaining a second copy of the command surface.
     /// </summary>
     internal sealed class MetaCommand : CucliCommand
     {
@@ -26,7 +26,7 @@ namespace CustomUnityCli.Editor
         // the environment, and the contract requires the declared order to lead with the default.
         public override CucliActionInfo[] Actions => Declare(
             "doctor", "Worker-side environment report: command diagnostics, optional packages, versions.",
-            "export-registry", "Regenerate the shipped commands/registry.json from the compiled package commands only.",
+            "export-registry", "Regenerate the shipped commands/registry.json index and commands/modules shards from the compiled package commands only.",
             "catalog", "Dump the runtime command catalog exactly as published to Library/CustomUnityCli.",
             "schema", "Return the parameter JSON schema of one command group.",
             "extensions", "Report the project-local extension area and the commands it contributes.",
@@ -53,7 +53,7 @@ namespace CustomUnityCli.Editor
     },
     ""path"": {
       ""type"": ""string"",
-      ""description"": ""action=export-registry: destination for registry.json. Relative paths resolve against the project root.""
+      ""description"": ""action=export-registry: destination for the registry.json index. Relative paths resolve against the project root. A file named registry.json also rewrites sibling commands/modules shards.""
     },
     ""group"": { ""type"": ""string"", ""description"": ""action=schema / new-command: group name, e.g. object."" },
     ""summary"": { ""type"": ""string"", ""description"": ""action=new-command: one-line description of the group."" },
@@ -604,8 +604,8 @@ namespace " + ns + @"
             // This is the single most important line in the file: the registry written here lives
             // inside the package repository, so including a project-local command would push
             // project-specific code upstream as a side effect of running a refresh command.
-            var groups = new JArray();
             var excluded = new JArray();
+            var packageGroups = new System.Collections.Generic.List<CucliCommandDescriptor>();
             var descriptors = CucliCommandRegistry.Descriptors();
             foreach (CucliCommandDescriptor descriptor in descriptors)
             {
@@ -619,30 +619,8 @@ namespace " + ns + @"
                     });
                     continue;
                 }
-                var actions = new JArray();
-                foreach (CucliActionDescriptor action in descriptor.Actions ?? Array.Empty<CucliActionDescriptor>())
-                {
-                    actions.Add(new JObject { ["name"] = action.Name, ["summary"] = action.Summary });
-                }
 
-                groups.Add(new JObject
-                {
-                    ["name"] = descriptor.Name,
-                    ["summary"] = descriptor.Summary,
-                    ["requiresEditor"] = descriptor.RequiresEditor,
-                    ["requiredMode"] = descriptor.RequiredMode,
-                    ["mutatesProject"] = descriptor.MutatesProject,
-                    ["mayReloadDomain"] = descriptor.MayReloadDomain,
-                    ["optionalPackage"] = descriptor.OptionalPackage == null
-                        ? JValue.CreateNull()
-                        : new JValue(descriptor.OptionalPackage),
-                    ["effects"] = new JArray(descriptor.Effects ?? Array.Empty<string>()),
-                    ["surface"] = string.IsNullOrWhiteSpace(descriptor.Surface)
-                        ? "core"
-                        : descriptor.Surface,
-                    ["actions"] = actions,
-                    ["parametersSchema"] = SafeSchema(descriptor.ParametersSchemaJson)
-                });
+                packageGroups.Add(descriptor);
             }
 
             root["name"] = "com.igp.custom-unity-cli";
@@ -655,11 +633,20 @@ namespace " + ns + @"
             root["aliases"] = aliases ?? new JObject();
             root["controlActions"] = controlActions ?? new JArray("editor/stop", "editor/pause");
             root["offline"] = offline ?? new JArray();
-            root["groups"] = groups;
 
+            JArray includes;
+            int groupCount;
+            int actionCount;
             try
             {
-                CucliPaths.WriteAtomic(absolute, root.ToString(Newtonsoft.Json.Formatting.Indented) + Environment.NewLine);
+                CucliRegistryExport.Write(
+                    absolute,
+                    root,
+                    packageGroups,
+                    SafeSchema,
+                    out includes,
+                    out groupCount,
+                    out actionCount);
             }
             catch (Exception exception)
             {
@@ -669,6 +656,16 @@ namespace " + ns + @"
             }
 
             context.AddArtifact(absolute);
+            if (includes != null)
+            {
+                string commandsDir = Path.GetDirectoryName(absolute);
+                foreach (JToken include in includes)
+                {
+                    string relative = include == null ? null : include.Value<string>();
+                    if (string.IsNullOrWhiteSpace(relative) || string.IsNullOrEmpty(commandsDir)) continue;
+                    context.AddArtifact(Path.Combine(commandsDir, relative.Replace('/', Path.DirectorySeparatorChar)));
+                }
+            }
 
             if (excluded.Count > 0)
             {
@@ -679,16 +676,13 @@ namespace " + ns + @"
                     + ". Run 'cucli meta extensions' to list them.");
             }
 
-            int actionCount = groups
-                .Select(item => item["actions"] as JArray)
-                .Sum(actions => actions == null ? 0 : actions.Count);
-
             string localRegistryPath = WriteLocalRegistry(descriptors, excluded, context);
 
             return CucliCommandResult.Ok(new
             {
                 path = absolute,
-                groupCount = groups.Count,
+                includes,
+                groupCount,
                 actionCount,
                 catalogHash = CucliCommandRegistry.CatalogHash,
                 fullCatalogHash = CucliCommandRegistry.FullCatalogHash,

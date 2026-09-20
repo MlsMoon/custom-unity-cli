@@ -1,0 +1,375 @@
+{
+  "schemaVersion": "cucli.command-registry-module/v1",
+  "module": "extended-capture",
+  "groups": [
+    {
+      "name": "frame",
+      "summary": "Inspect frame, scene and camera render state over a real observation window, and capture one or many frames to Assets/Docs~.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.frame.read",
+        "filesystem.write"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "inspect",
+          "summary": "Scene, play/pause, time scale, cameras with projection and clip planes, active render textures, and which cameras actually rendered."
+        },
+        {
+          "name": "capture",
+          "summary": "Write one frame or a timed sequence from the project's Scene camera, a named camera, or the Scene view, plus a manifest."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "inspect",
+              "capture"
+            ],
+            "default": "inspect"
+          },
+          "observeMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5000,
+            "default": 100,
+            "description": "inspect: how long to watch real render callbacks. 0 skips observation entirely."
+          },
+          "folder": {
+            "type": "string",
+            "description": "capture: a single folder name under Assets/Docs~, given as <date>_<feature> (e.g. 0915_渲染分析). A bare feature name is auto-dated."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "all",
+              "scenecam",
+              "camera",
+              "sceneview"
+            ],
+            "default": "all",
+            "description": "capture: all = scenecam + sceneview. scenecam/camera read an existing render texture; sceneview renders on demand."
+          },
+          "camera": {
+            "type": "string",
+            "description": "capture: camera name or instance id, required when source=camera."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "capture: file name prefix. Must not contain a path separator or '..'."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 1,
+            "description": "capture: number of frames. Above 1 each frame is numbered."
+          },
+          "intervalMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "default": 250,
+            "description": "capture: minimum wait between grabs. count-1 times this must not exceed 60000."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096,
+            "default": 1920,
+            "description": "capture: only used by source=sceneview."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096,
+            "default": 1080,
+            "description": "capture: only used by source=sceneview."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "capture: overwrite existing PNGs and manifest instead of refusing."
+          },
+          "includeCameras": {
+            "type": "boolean",
+            "default": true,
+            "description": "inspect: include the per-camera array."
+          }
+        }
+      }
+    },
+    {
+      "name": "input",
+      "summary": "Inspect the pointer and the UI or world object under it, and synthesise mouse, key or scroll input.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.input.write",
+        "editor.input.read"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "pointer-inspect",
+          "summary": "What is under the pointer: UI elements with a safe text summary, the Scene-view object, and a game-view physics hit."
+        },
+        {
+          "name": "ui-pointer",
+          "summary": "Spelled the way the MCP contract spells it. Identical to pointer-inspect; both names stay registered so neither caller breaks."
+        },
+        {
+          "name": "move",
+          "summary": "Move the pointer to a screen point."
+        },
+        {
+          "name": "click",
+          "summary": "Press and release a mouse button at a screen point, across separate frames."
+        },
+        {
+          "name": "drag",
+          "summary": "Press at a start point, move through waypoints, release."
+        },
+        {
+          "name": "scroll",
+          "summary": "Send a scroll delta."
+        },
+        {
+          "name": "key",
+          "summary": "Press and release a key, as an Editor key event."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "pointer-inspect",
+              "ui-pointer",
+              "move",
+              "click",
+              "drag",
+              "scroll",
+              "key"
+            ],
+            "default": "pointer-inspect"
+          },
+          "x": {
+            "type": "number",
+            "description": "Screen X. Origin is bottom-left, matching Screen and Input coordinates."
+          },
+          "y": {
+            "type": "number",
+            "description": "Screen Y measured from the bottom."
+          },
+          "button": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right",
+              "middle"
+            ],
+            "default": "left"
+          },
+          "points": {
+            "type": "array",
+            "description": "drag: waypoints as {x,y} or [x,y]. Also accepts @file.json containing a 'points' array.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "agent": {
+            "type": "string",
+            "description": "Gesture attribution, as in the MCP contract. Accepted and echoed back on the response; it never changes behaviour."
+          },
+          "deltaX": {
+            "type": "number",
+            "default": 0
+          },
+          "deltaY": {
+            "type": "number",
+            "default": 0
+          },
+          "scrollX": {
+            "type": "number",
+            "default": 0
+          },
+          "scrollY": {
+            "type": "number",
+            "default": 120
+          },
+          "key": {
+            "type": "string",
+            "description": "key: a KeyCode or Event.KeyboardEvent name such as Space, Return, LeftShift, a."
+          },
+          "backend": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "inputsystem",
+              "editor-event"
+            ],
+            "default": "auto",
+            "description": "Which injection backend to use. auto prefers editor-event, and uses inputsystem in Play Mode when asked for explicitly."
+          },
+          "targetWindow": {
+            "type": "string",
+            "description": "editor-event: Editor window type or title to receive the event. Defaults to the focused window, or the active Scene view for pointer gestures."
+          },
+          "holdFrames": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 120,
+            "default": 1,
+            "description": "Frames to hold a button down before releasing."
+          },
+          "settleFrames": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 120,
+            "default": 2,
+            "description": "Frames to wait after injection so the target can react."
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64,
+            "default": 16
+          },
+          "includeText": {
+            "type": "boolean",
+            "default": true,
+            "description": "pointer-inspect: summarise text components. Always through the field allow-list."
+          }
+        }
+      }
+    },
+    {
+      "name": "recorder",
+      "summary": "Run a resumable capture session: record frames to PNG, or drive the Unity Recorder package for video when it is installed.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "filesystem.write",
+        "editor.frame.read"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "status",
+          "summary": "Read the session record; works after a domain reload or an Editor restart."
+        },
+        {
+          "name": "start",
+          "summary": "Begin a session. Refuses if one is already recording."
+        },
+        {
+          "name": "stop",
+          "summary": "End the active session, write its manifest and report the summary. Idempotent."
+        },
+        {
+          "name": "frame",
+          "summary": "Capture exactly one frame now, inside the active session or on its own."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "start",
+              "stop",
+              "frame"
+            ],
+            "default": "status"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "frames",
+              "video"
+            ],
+            "default": "auto",
+            "description": "auto picks frames and reports why; video needs the Unity Recorder package."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "game",
+              "sceneview",
+              "scenecam"
+            ],
+            "default": "game"
+          },
+          "target": {
+            "type": "string",
+            "description": "Camera name or instance id for source=game."
+          },
+          "outputFolder": {
+            "type": "string",
+            "description": "Defaults to Assets/Docs~/Recordings."
+          },
+          "prefix": {
+            "type": "string",
+            "default": "rec"
+          },
+          "intervalMs": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 10000,
+            "default": 200
+          },
+          "maxFrames": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 120
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096
+          },
+          "fps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 120,
+            "default": 30,
+            "description": "video: frame rate for the Recorder."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "frame: overwrite an existing PNG."
+          }
+        }
+      }
+    }
+  ]
+}

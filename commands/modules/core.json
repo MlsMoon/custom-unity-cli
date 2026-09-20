@@ -1,0 +1,698 @@
+{
+  "schemaVersion": "cucli.command-registry-module/v1",
+  "module": "core",
+  "groups": [
+    {
+      "name": "console",
+      "summary": "Read the captured Editor console (filter by level, regex and time) or clear it.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.console.read"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "get",
+          "summary": "Read console entries. Paged, newest-last, with a bounded default page size."
+        },
+        {
+          "name": "clear",
+          "summary": "Append a clear marker so every earlier entry is treated as cleared."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "get",
+              "clear"
+            ],
+            "default": "get"
+          },
+          "level": {
+            "type": "string",
+            "description": "log|warning|error|assert|exception (also repeatable/comma separated)."
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Alias of 'level' (MCP naming); 'all' expands to log/warning/error/assert/exception."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Upper bound for one response; used as the page size unless pageSize is given."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Opaque paging cursor from the previous response, or a plain offset."
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "page_number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "grep": {
+            "type": "string",
+            "description": "Regular expression matched against message and stack trace."
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO-8601 time; entries older than this are dropped."
+          },
+          "includeStackTraces": {
+            "type": "boolean",
+            "default": false
+          },
+          "include_stacktraces": {
+            "type": "boolean",
+            "default": false
+          },
+          "include_stack_traces": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "editor",
+      "summary": "Inspect and control the Editor: state, Play Mode, menu items, undo/redo, tool, tags, layers, selection.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.state.read",
+        "editor.state.write",
+        "project.settings.write",
+        "editor.selection.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "state",
+          "summary": "Report project identity, compile/import/Play Mode flags, open scenes and worker session."
+        },
+        {
+          "name": "ping",
+          "summary": "Round-trip liveness probe; the cheapest way to prove the queue is wired up."
+        },
+        {
+          "name": "play",
+          "summary": "Enter Play Mode."
+        },
+        {
+          "name": "stop",
+          "summary": "Leave Play Mode."
+        },
+        {
+          "name": "pause",
+          "summary": "Toggle pause. Only valid in Play Mode."
+        },
+        {
+          "name": "step",
+          "summary": "Advance one frame. Only valid while paused in Play Mode."
+        },
+        {
+          "name": "menu",
+          "summary": "Execute a menu item by its exact path, e.g. 'GameObject/Create Empty'."
+        },
+        {
+          "name": "undo",
+          "summary": "Perform one Undo."
+        },
+        {
+          "name": "redo",
+          "summary": "Perform one Redo."
+        },
+        {
+          "name": "tool",
+          "summary": "Set the active Scene view tool."
+        },
+        {
+          "name": "tool-list",
+          "summary": "List the available Scene view tools."
+        },
+        {
+          "name": "tag-list",
+          "summary": "List every project tag."
+        },
+        {
+          "name": "tag-add",
+          "summary": "Create a project tag."
+        },
+        {
+          "name": "tag-remove",
+          "summary": "Delete a project tag."
+        },
+        {
+          "name": "layer-list",
+          "summary": "List all 32 layers, marking the built-in ones."
+        },
+        {
+          "name": "layer-add",
+          "summary": "Create a user layer in the first free slot (8-31)."
+        },
+        {
+          "name": "layer-remove",
+          "summary": "Clear a user layer. Built-in layers cannot be removed."
+        },
+        {
+          "name": "selection-get",
+          "summary": "Report the current selection."
+        },
+        {
+          "name": "selection-set",
+          "summary": "Replace the selection with resolved objects."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "state",
+              "ping",
+              "play",
+              "stop",
+              "pause",
+              "step",
+              "menu",
+              "undo",
+              "redo",
+              "tool",
+              "tool-list",
+              "tag-list",
+              "tag-add",
+              "tag-remove",
+              "layer-list",
+              "layer-add",
+              "layer-remove",
+              "selection-get",
+              "selection-set"
+            ]
+          },
+          "menuPath": {
+            "type": "string",
+            "description": "action=menu: exact menu path, '/' separated."
+          },
+          "tool": {
+            "type": "string",
+            "description": "action=tool: View, Move, Rotate, Rect, Scale, Custom, None."
+          },
+          "tag": {
+            "type": "string",
+            "description": "action=tag-add / tag-remove."
+          },
+          "layer": {
+            "type": "string",
+            "description": "action=layer-add / layer-remove: layer name."
+          },
+          "target": {
+            "type": "string",
+            "description": "action=selection-set: name, hierarchy path or instance id."
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=selection-set: hierarchy paths."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "meta",
+      "summary": "Inspect and refresh the command surface itself: export the static registry, scaffold project-local commands, report the worker environment.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "filesystem.write",
+        "editor.state.read"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "doctor",
+          "summary": "Worker-side environment report: command diagnostics, optional packages, versions."
+        },
+        {
+          "name": "export-registry",
+          "summary": "Regenerate the shipped commands/registry.json from the compiled package commands only."
+        },
+        {
+          "name": "catalog",
+          "summary": "Dump the runtime command catalog exactly as published to Library/CustomUnityCli."
+        },
+        {
+          "name": "schema",
+          "summary": "Return the parameter JSON schema of one command group."
+        },
+        {
+          "name": "extensions",
+          "summary": "Report the project-local extension area and the commands it contributes."
+        },
+        {
+          "name": "new-command",
+          "summary": "Scaffold a new project-local command group in the extension area."
+        },
+        {
+          "name": "verify",
+          "summary": "Self-check: validate the extension area and every command's action list against its JSON schema."
+        },
+        {
+          "name": "environment",
+          "summary": "Report Unity, platform, package versions and the optional-package probe results."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "export-registry",
+              "catalog",
+              "schema",
+              "doctor",
+              "extensions",
+              "new-command",
+              "verify",
+              "environment"
+            ],
+            "default": "doctor"
+          },
+          "path": {
+            "type": "string",
+            "description": "action=export-registry: destination for registry.json. Relative paths resolve against the project root."
+          },
+          "group": {
+            "type": "string",
+            "description": "action=schema / new-command: group name, e.g. object."
+          },
+          "summary": {
+            "type": "string",
+            "description": "action=new-command: one-line description of the group."
+          },
+          "actionNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=new-command: sub-action names to scaffold. Defaults to a single 'run' action."
+          },
+          "actionName": {
+            "type": "string",
+            "description": "action=new-command: a single sub-action to scaffold, as an alternative to actionNames. Note that the bare name 'action' is reserved by the CLI as the group action selector."
+          },
+          "namespace": {
+            "type": "string",
+            "description": "action=new-command: C# namespace for the generated file."
+          },
+          "overwrite": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=new-command: overwrite an existing file."
+          }
+        }
+      }
+    },
+    {
+      "name": "refresh",
+      "summary": "Refresh assets, trigger or await script compilation, reimport specific paths, and wait for the Editor to become idle.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": true,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.write",
+        "project.recompile",
+        "editor.state.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "assets",
+          "summary": "Rescan the asset database (AssetDatabase.Refresh)."
+        },
+        {
+          "name": "compile",
+          "summary": "Request script compilation and, by default, wait until it finishes."
+        },
+        {
+          "name": "reimport",
+          "summary": "Force-reimport specific asset paths."
+        },
+        {
+          "name": "wait",
+          "summary": "Block until the Editor is idle: not compiling and not importing."
+        },
+        {
+          "name": "status",
+          "summary": "Report compile/import state and the first compilation error, if any."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "assets",
+              "compile",
+              "reimport",
+              "wait",
+              "status"
+            ],
+            "default": "assets"
+          },
+          "path": {
+            "type": "string",
+            "description": "action=reimport: one asset path."
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=reimport: several asset paths."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=reimport: force update."
+          },
+          "wait": {
+            "type": "boolean",
+            "default": true,
+            "description": "action=compile: wait for compilation to finish."
+          },
+          "requireCompileSuccess": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=wait: fail if the last compilation had errors."
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1800,
+            "default": 300
+          }
+        }
+      }
+    },
+    {
+      "name": "selftest",
+      "summary": "Test the tool itself: echo a payload back, verify the shared helpers, and classify every registered action.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.state.read",
+        "filesystem.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "core",
+          "summary": "Run assertions over the shared helper layer (args, values, describe, paging, reflection, serialized, assets, paths, json)."
+        },
+        {
+          "name": "echo",
+          "summary": "Return the payload unchanged plus a token, to prove end-to-end fidelity through the queue."
+        },
+        {
+          "name": "surface",
+          "summary": "Classify every registered action as read-only, mutating or destructive, with its safety metadata."
+        },
+        {
+          "name": "sample",
+          "summary": "Produce a compact overview: group and action counts, helper check summary, optional package availability."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "echo",
+              "core",
+              "surface",
+              "sample"
+            ],
+            "default": "core"
+          },
+          "token": {
+            "type": "string",
+            "description": "action=echo: arbitrary token echoed back verbatim."
+          },
+          "mutate": {
+            "type": "boolean",
+            "default": false,
+            "description": "Allow the few checks that must write (a temporary folder, runtime scratch files)."
+          },
+          "group": {
+            "type": "string",
+            "description": "action=surface: restrict the plan to one group."
+          },
+          "verbose": {
+            "type": "boolean",
+            "default": false,
+            "description": "Include a detail line for every passing check."
+          }
+        }
+      }
+    },
+    {
+      "name": "test",
+      "summary": "Unity Test Framework: start an EditMode or PlayMode run, poll its progress and failures, read the results.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": "com.unity.test-framework",
+      "effects": [
+        "editor.tests.run",
+        "editor.state.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "status",
+          "summary": "Poll a test job by jobId: progress, stuck detection and the first failures."
+        },
+        {
+          "name": "run",
+          "summary": "Start a test run. Returns jobId immediately; at most one job runs at a time."
+        },
+        {
+          "name": "result",
+          "summary": "Read the finished summary and the individual test cases (paged)."
+        },
+        {
+          "name": "list",
+          "summary": "List the retained test jobs (at most 10). Paged."
+        },
+        {
+          "name": "cancel",
+          "summary": "Mark the current test job as cancelled (Unity cannot abort a run in flight)."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "run",
+              "result",
+              "list",
+              "cancel"
+            ],
+            "default": "status"
+          },
+          "jobId": {
+            "type": "string",
+            "description": "action=status/result/cancel: test job id."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "Alias of 'jobId'."
+          },
+          "mode": {
+            "type": "string",
+            "description": "action=run: EditMode (default) or PlayMode."
+          },
+          "includeDetails": {
+            "type": "boolean",
+            "default": false,
+            "description": "Return every test case (paged)."
+          },
+          "include_details": {
+            "type": "boolean",
+            "default": false
+          },
+          "includeFailedTests": {
+            "type": "boolean",
+            "default": false,
+            "description": "Return only the cases that did not pass."
+          },
+          "include_failed_tests": {
+            "type": "boolean",
+            "default": false
+          },
+          "testNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "test_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "groupNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "group_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categoryNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "category_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assemblyNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assembly_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "initTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 600000,
+            "default": 15000
+          },
+          "init_timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 600000
+          },
+          "clearStuck": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=run: clear the stuck job instead of starting one."
+          },
+          "clear_stuck": {
+            "type": "boolean",
+            "default": false
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  ]
+}

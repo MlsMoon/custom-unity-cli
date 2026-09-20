@@ -130,6 +130,13 @@ namespace CustomUnityCli.Editor
         /// because the host owns them, not because they are part of this package's stable contract.
         /// </summary>
         public string Surface { get; set; }
+
+        /// <summary>
+        /// Package-registry shard id derived from the source folder under
+        /// <c>Editor/Commands/</c>, e.g. <c>core-assets</c> or <c>extended-presentation</c>.
+        /// Null for project commands, which never enter the published shards.
+        /// </summary>
+        public string RegistryModule { get; set; }
     }
 
     internal sealed class CucliCommandDiagnostic

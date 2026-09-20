@@ -128,7 +128,8 @@ In total **32 Editor command groups carrying 417 actions**, plus 9 offline group
 - Destructive actions require `--force` and otherwise fail with `CONFIRMATION_REQUIRED`.
 - Duplicate command names, missing constructors and empty names are reported in the catalog's
   `diagnostics[]` instead of being silently ignored.
-- `cucli commands export` regenerates the shipped `commands/registry.json` from the compiled worker,
+- `cucli commands export` regenerates the shipped catalog index `commands/registry.json` plus
+  `commands/modules/*.json` (one shard per `Editor/Commands` folder) from the compiled worker,
   and `cucli doctor` compares the two catalog hashes to detect drift.
 - Command types no longer have to be public. The registry constructs them by reflection, so both the
   package's own `internal sealed class` commands and internal project extensions register correctly.

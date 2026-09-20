@@ -1,0 +1,374 @@
+{
+  "schemaVersion": "cucli.command-registry-module/v1",
+  "module": "extended-project",
+  "groups": [
+    {
+      "name": "build",
+      "summary": "Player builds and build settings: build, poll status, switch platform, read/write player settings, build scenes, named build profiles and batch builds.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": true,
+      "optionalPackage": null,
+      "effects": [
+        "project.build",
+        "project.settings.write",
+        "project.assets.write",
+        "editor.state.write"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "status",
+          "summary": "Report a build or batch job by job_id (defaults to the most recent one). Read-only."
+        },
+        {
+          "name": "build",
+          "summary": "Start a player build. Returns job_id and pollInterval immediately."
+        },
+        {
+          "name": "platform",
+          "summary": "Read or switch the active build target and its subtarget."
+        },
+        {
+          "name": "settings",
+          "summary": "Read or write a PlayerSettings entry for the active target."
+        },
+        {
+          "name": "scenes",
+          "summary": "Read or write EditorBuildSettings.scenes. Reading is paged."
+        },
+        {
+          "name": "profiles",
+          "summary": "List, read, save or activate named build configurations."
+        },
+        {
+          "name": "batch",
+          "summary": "Build several targets one after another. Returns job_id and pollInterval immediately."
+        },
+        {
+          "name": "cancel",
+          "summary": "Cancel a batch job. Single-target builds cannot be cancelled."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "build",
+              "platform",
+              "settings",
+              "scenes",
+              "profiles",
+              "batch",
+              "cancel"
+            ],
+            "default": "status"
+          },
+          "jobId": {
+            "type": "string",
+            "description": "action=status/cancel: job handle (job_id)."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "Alias of 'jobId'."
+          },
+          "target": {
+            "type": "string",
+            "description": "windows64|windows|osx|linux64|android|ios|webgl|uwp|tvos or a BuildTarget name."
+          },
+          "outputPath": {
+            "type": "string",
+            "description": "action=build: output path relative to the project root."
+          },
+          "output_path": {
+            "type": "string",
+            "description": "Alias of 'outputPath'."
+          },
+          "outputDir": {
+            "type": "string",
+            "description": "action=batch: replaces the default 'Builds' root."
+          },
+          "output_dir": {
+            "type": "string",
+            "description": "Alias of 'outputDir'."
+          },
+          "scenes": {
+            "type": "array",
+            "items": {},
+            "description": "Scene asset paths, or objects with path/enabled."
+          },
+          "development": {
+            "type": "boolean",
+            "default": false
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "clean_build, auto_run, deep_profiling, ..."
+          },
+          "subtarget": {
+            "type": "string",
+            "description": "player (default) or server."
+          },
+          "scriptingBackend": {
+            "type": "string",
+            "description": "action=build: mono or il2cpp."
+          },
+          "scripting_backend": {
+            "type": "string",
+            "description": "Alias of 'scriptingBackend'."
+          },
+          "profile": {
+            "type": "string",
+            "description": "action=build/profiles: named profile or a BuildProfile asset path."
+          },
+          "property": {
+            "type": "string",
+            "aliases": [
+              "key"
+            ],
+            "description": "action=settings: product_name|company_name|version|bundle_id|scripting_backend|defines|architecture。也接受 --key。"
+          },
+          "value": {
+            "type": "string",
+            "description": "action=settings: omit to read, provide to write."
+          },
+          "activate": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=profiles: activate the named profile."
+          },
+          "save": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=profiles: create or update the named profile."
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=batch: profile names to build, mutually exclusive with 'targets'."
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=batch: build targets, mutually exclusive with 'profiles'."
+          },
+          "append": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=scenes: append instead of replacing the list."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=scenes: required to clear the scene list."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "package",
+      "summary": "Unity Package Manager: install, remove, embed, list, search, inspect packages and manage scoped registries.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.packages.read",
+        "project.packages.write",
+        "project.settings.write",
+        "project.assets.write"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Report the Package Manager liveness facts: Unity version, installed package count, busy flags."
+        },
+        {
+          "name": "status",
+          "summary": "Poll a package job by job_id (defaults to the most recent one)."
+        },
+        {
+          "name": "list_packages",
+          "summary": "List the packages registered in this project. Paged."
+        },
+        {
+          "name": "search_packages",
+          "summary": "Search the registry for a package by name or id. Paged."
+        },
+        {
+          "name": "get_package_info",
+          "summary": "Describe one installed package, including its dependencies."
+        },
+        {
+          "name": "list_registries",
+          "summary": "List the scoped registries declared in Packages/manifest.json."
+        },
+        {
+          "name": "add_package",
+          "summary": "Install a package. Returns a job handle; poll it with action=status."
+        },
+        {
+          "name": "remove_package",
+          "summary": "Uninstall a package. Returns a job handle; poll it with action=status."
+        },
+        {
+          "name": "embed_package",
+          "summary": "Embed a package into Packages/. Returns a job handle; poll it with action=status."
+        },
+        {
+          "name": "add_registry",
+          "summary": "Add a scoped registry to Packages/manifest.json (the file is backed up first)."
+        },
+        {
+          "name": "remove_registry",
+          "summary": "Remove a scoped registry from Packages/manifest.json (the file is backed up first)."
+        },
+        {
+          "name": "resolve_packages",
+          "summary": "Ask the Package Manager to re-resolve the project manifest."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "status",
+              "list_packages",
+              "search_packages",
+              "get_package_info",
+              "list_registries",
+              "add_package",
+              "remove_package",
+              "embed_package",
+              "add_registry",
+              "remove_registry",
+              "resolve_packages"
+            ],
+            "default": "ping"
+          },
+          "package": {
+            "type": "string",
+            "description": "action=add/remove/embed/get_package_info: package id, optionally name@version."
+          },
+          "packageId": {
+            "type": "string",
+            "description": "Alias of 'package'."
+          },
+          "package_id": {
+            "type": "string",
+            "description": "Alias of 'package'."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=remove_package: remove even when other packages depend on it."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "action=status: job handle."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "Alias of 'jobId'."
+          },
+          "query": {
+            "type": "string",
+            "description": "action=search_packages: search string."
+          },
+          "name": {
+            "type": "string",
+            "description": "action=add_registry/remove_registry: registry name."
+          },
+          "url": {
+            "type": "string",
+            "description": "action=add_registry/remove_registry: registry url."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "action=add_registry: scope strings."
+          },
+          "offline": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=list_packages: use the local cache instead of the network."
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 20
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "page_number": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  ]
+}

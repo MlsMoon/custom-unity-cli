@@ -1,0 +1,912 @@
+{
+  "schemaVersion": "cucli.command-registry-module/v1",
+  "module": "core-assets",
+  "groups": [
+    {
+      "name": "asset",
+      "summary": "Work with project assets: import, create, modify, delete, duplicate, move/rename, search, describe, folders, components.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "import",
+          "summary": "Reimport an asset from disk."
+        },
+        {
+          "name": "create",
+          "summary": "Create an asset (folder, material, physicsmaterial, scriptableobject, textasset, animationclip, texture2d, rendertexture, scene, json)."
+        },
+        {
+          "name": "modify",
+          "summary": "Write serialized fields on an existing asset."
+        },
+        {
+          "name": "delete",
+          "summary": "Delete an asset or folder. Requires force=true."
+        },
+        {
+          "name": "duplicate",
+          "summary": "Copy an asset to a new path."
+        },
+        {
+          "name": "move",
+          "summary": "Move an asset to another folder."
+        },
+        {
+          "name": "rename",
+          "summary": "Rename an asset in place."
+        },
+        {
+          "name": "search",
+          "summary": "Page through assets filtered by folder, name, type and modification date."
+        },
+        {
+          "name": "get_info",
+          "summary": "Describe one asset without serialising its contents."
+        },
+        {
+          "name": "create_folder",
+          "summary": "Create a folder and every missing parent."
+        },
+        {
+          "name": "get_components",
+          "summary": "List the component types on a prefab or model asset."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "import",
+              "create",
+              "modify",
+              "delete",
+              "duplicate",
+              "move",
+              "rename",
+              "search",
+              "get_info",
+              "create_folder",
+              "get_components"
+            ],
+            "default": "import"
+          },
+          "path": {
+            "type": "string",
+            "description": "Target asset path. For search: optional folder scope.",
+            "aliases": [
+              "assetPath",
+              "asset_path"
+            ]
+          },
+          "destination": {
+            "type": "string",
+            "description": "action=duplicate/move/rename: target path.",
+            "aliases": [
+              "destinationPath",
+              "destination_path",
+              "targetPath",
+              "target_path",
+              "newName",
+              "new_name",
+              "name"
+            ]
+          },
+          "assetType": {
+            "type": "string",
+            "aliases": [
+              "asset_type"
+            ],
+            "description": "action=create: folder, material, physicsmaterial, scriptableobject/so, textasset, animationclip, texture2d, rendertexture, scene, json."
+          },
+          "properties": {
+            "type": "object",
+            "description": "action=create/modify: member name to value."
+          },
+          "contents": {
+            "type": "string",
+            "description": "action=create: text payload for textasset/json."
+          },
+          "name": {
+            "type": "string",
+            "description": "action=create: file name when path is only a folder."
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=delete/import: confirm the destructive or forced operation."
+          },
+          "generatePreview": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "generate_preview"
+            ]
+          },
+          "searchPattern": {
+            "type": "string",
+            "aliases": [
+              "search_pattern"
+            ],
+            "description": "action=search: raw AssetDatabase filter fragment."
+          },
+          "filterType": {
+            "type": "string",
+            "aliases": [
+              "filter_type",
+              "type"
+            ],
+            "description": "action=search: type filter, e.g. Material or t:Material. Also accepts --type."
+          },
+          "filterName": {
+            "type": "string",
+            "aliases": [
+              "filter_name",
+              "nameFilter",
+              "name_filter"
+            ],
+            "description": "action=search: file name substring."
+          },
+          "filterDateAfter": {
+            "type": "string",
+            "aliases": [
+              "filter_date_after"
+            ],
+            "description": "action=search: ISO 8601 lower bound on LastWriteTimeUtc."
+          },
+          "filterDateBefore": {
+            "type": "string",
+            "aliases": [
+              "filter_date_before"
+            ],
+            "description": "action=search: ISO 8601 upper bound on LastWriteTimeUtc."
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 50,
+            "aliases": [
+              "page_size"
+            ]
+          },
+          "pageNumber": {
+            "type": "integer",
+            "default": 1,
+            "aliases": [
+              "page_number"
+            ]
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          },
+          "maxStringLength": {
+            "type": "integer",
+            "default": 4096,
+            "aliases": [
+              "max_string_length"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "material",
+      "summary": "Create materials, write shader properties and colours, assign materials to renderers, inspect a material's shader surface.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "ping",
+          "summary": "Liveness probe for this command group."
+        },
+        {
+          "name": "create",
+          "summary": "Create a material asset with a shader and optional initial properties."
+        },
+        {
+          "name": "set_material_shader_property",
+          "summary": "Write one shader property (float/int/color/vector/texture)."
+        },
+        {
+          "name": "set_material_color",
+          "summary": "Write a colour on a material."
+        },
+        {
+          "name": "assign_material_to_renderer",
+          "summary": "Assign a material asset to a renderer slot."
+        },
+        {
+          "name": "set_renderer_color",
+          "summary": "Set a colour on a material, in place or as a new instance/asset."
+        },
+        {
+          "name": "get_material_info",
+          "summary": "Report shader name, property names, keywords and optionally values."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "create",
+              "set_material_shader_property",
+              "set_material_color",
+              "assign_material_to_renderer",
+              "set_renderer_color",
+              "get_material_info"
+            ],
+            "default": "ping"
+          },
+          "materialPath": {
+            "type": "string",
+            "aliases": [
+              "material_path",
+              "path"
+            ],
+            "description": "Assets 相对材质路径，自动补 Assets/ 前缀与 .mat 后缀。也接受 --path。"
+          },
+          "property": {
+            "type": "string",
+            "description": "着色器属性名。"
+          },
+          "value": {
+            "description": "属性值：number / bool / array / object / string。"
+          },
+          "color": {
+            "description": "颜色：[r,g,b(,a)] / 对象 {r,g,b,a} / #RRGGBB(AA)。"
+          },
+          "shader": {
+            "type": "string",
+            "description": "action=create: 着色器名，默认按当前渲染管线解析。"
+          },
+          "properties": {
+            "type": "object",
+            "description": "action=create: 批量属性表。"
+          },
+          "target": {
+            "type": "string",
+            "description": "action=assign_material_to_renderer/set_renderer_color: 场景 GameObject 名称或层级路径。"
+          },
+          "searchMethod": {
+            "type": "string",
+            "aliases": [
+              "search_method"
+            ],
+            "description": "by_name / by_path / by_id / by_tag / by_layer / by_component。"
+          },
+          "slot": {
+            "type": "integer",
+            "default": 0
+          },
+          "mode": {
+            "type": "string",
+            "default": "property_block",
+            "description": "property_block / shared / instance / create_unique。"
+          },
+          "includeValues": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "include_values"
+            ],
+            "description": "action=get_material_info: 是否返回属性值。"
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "script",
+      "summary": "Create, read, edit, validate, hash and delete C# scripts under Assets/.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": true,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "create",
+          "summary": "Create a .cs file from a template or explicit contents."
+        },
+        {
+          "name": "read",
+          "summary": "Read a slice of a script: line range and maximum characters."
+        },
+        {
+          "name": "update",
+          "summary": "Deprecated alias of apply_text_edits (whole-file overwrite with the given contents)."
+        },
+        {
+          "name": "edit",
+          "summary": "Structured edits: replace/delete class or method, anchor insert/delete/replace."
+        },
+        {
+          "name": "apply_text_edits",
+          "summary": "Replace exact line/column ranges, guarded by a precondition SHA-256."
+        },
+        {
+          "name": "validate",
+          "summary": "Structural validation: bracket balance, using/namespace consistency, duplicate members."
+        },
+        {
+          "name": "get_sha",
+          "summary": "Report the SHA-256 of the file contents."
+        },
+        {
+          "name": "delete",
+          "summary": "Move a script to the OS trash. Requires force=true."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "read",
+              "update",
+              "edit",
+              "apply_text_edits",
+              "validate",
+              "get_sha",
+              "delete"
+            ],
+            "default": "create"
+          },
+          "name": {
+            "type": "string",
+            "description": "类名或文件名，拼成 {name}.cs；须匹配 ^[a-zA-Z_][a-zA-Z0-9_]*$。"
+          },
+          "path": {
+            "type": "string",
+            "description": "相对 Assets/ 的目录；空时默认 Scripts。"
+          },
+          "contents": {
+            "type": "string",
+            "aliases": [
+              "content"
+            ],
+            "description": "action=create/update: 脚本正文。也接受 --content."
+          },
+          "contentsEncoded": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "contents_encoded"
+            ]
+          },
+          "encodedContents": {
+            "type": "string",
+            "aliases": [
+              "encoded_contents"
+            ],
+            "description": "contentsEncoded=true 时的 base64 正文。"
+          },
+          "scriptType": {
+            "type": "string",
+            "aliases": [
+              "script_type"
+            ],
+            "description": "action=create: MonoBehaviour / ScriptableObject / Editor / EditorWindow / Plain。"
+          },
+          "namespace": {
+            "type": "string",
+            "description": "action=create: 生成模板的外层 namespace。"
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "precondition_sha256": {
+            "type": "string",
+            "aliases": [
+              "preconditionSha256"
+            ],
+            "description": "action=apply_text_edits: 前置文件 SHA-256。"
+          },
+          "options": {
+            "type": "object",
+            "description": "{refresh, validate, applyMode}。"
+          },
+          "level": {
+            "type": "string",
+            "description": "action=validate: basic / standard / comprehensive / strict。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=delete: 必须显式确认。"
+          },
+          "startLine": {
+            "type": "integer",
+            "aliases": [
+              "start_line"
+            ],
+            "description": "action=read: 1 基起始行。"
+          },
+          "endLine": {
+            "type": "integer",
+            "aliases": [
+              "end_line"
+            ],
+            "description": "action=read: 1 基结束行（含）。"
+          },
+          "maxChars": {
+            "type": "integer",
+            "default": 20000,
+            "aliases": [
+              "max_chars",
+              "maxStringLength"
+            ],
+            "description": "action=read: 返回内容的最大字符数。"
+          }
+        }
+      }
+    },
+    {
+      "name": "shader",
+      "summary": "Create, read, update and delete .shader files, with URP and Built-in templates.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "create",
+          "summary": "Create a .shader file from the URP or Built-in template, or explicit contents."
+        },
+        {
+          "name": "read",
+          "summary": "Read a shader file: line range and maximum characters."
+        },
+        {
+          "name": "update",
+          "summary": "Replace a shader file's contents."
+        },
+        {
+          "name": "delete",
+          "summary": "Move a shader file to the OS trash. Requires force=true."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "read",
+              "update",
+              "delete"
+            ],
+            "default": "create"
+          },
+          "name": {
+            "type": "string",
+            "description": "着色器名，拼成 {name}.shader；须匹配 ^[a-zA-Z_][a-zA-Z0-9_]*$。"
+          },
+          "path": {
+            "type": "string",
+            "description": "相对 Assets/ 的目录；空时默认 Shaders。"
+          },
+          "contents": {
+            "type": "string",
+            "description": "action=create/update: 着色器源码。"
+          },
+          "contentsEncoded": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "contents_encoded"
+            ]
+          },
+          "encodedContents": {
+            "type": "string",
+            "aliases": [
+              "encoded_contents"
+            ]
+          },
+          "template": {
+            "type": "string",
+            "default": "urp",
+            "description": "action=create: urp 或 builtin。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=delete: 必须显式确认。"
+          },
+          "startLine": {
+            "type": "integer",
+            "aliases": [
+              "start_line"
+            ],
+            "description": "action=read: 1 基起始行。"
+          },
+          "endLine": {
+            "type": "integer",
+            "aliases": [
+              "end_line"
+            ],
+            "description": "action=read: 1 基结束行（含）。"
+          },
+          "maxChars": {
+            "type": "integer",
+            "default": 20000,
+            "aliases": [
+              "max_chars"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "so",
+      "summary": "Create and patch ScriptableObject assets: create/create_so, modify/modify_so, with dryRun validation.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "create",
+          "summary": "Create a ScriptableObject asset from a type name plus optional patches."
+        },
+        {
+          "name": "create_so",
+          "summary": "Alias of create (MCP spelling)."
+        },
+        {
+          "name": "modify",
+          "summary": "Patch serialized properties on an existing ScriptableObject asset."
+        },
+        {
+          "name": "modify_so",
+          "summary": "Alias of modify (MCP spelling)."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "create_so",
+              "modify",
+              "modify_so"
+            ],
+            "default": "create"
+          },
+          "typeName": {
+            "type": "string",
+            "aliases": [
+              "type_name"
+            ],
+            "description": "action=create: ScriptableObject type name or full name."
+          },
+          "folderPath": {
+            "type": "string",
+            "aliases": [
+              "folder_path"
+            ],
+            "description": "action=create: Assets/ 下的目标目录."
+          },
+          "assetName": {
+            "type": "string",
+            "aliases": [
+              "asset_name"
+            ],
+            "description": "action=create: 文件名，可省略 .asset 后缀."
+          },
+          "overwrite": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=create: 已存在时原地覆盖（保留 GUID）."
+          },
+          "target": {
+            "type": "object",
+            "description": "action=modify: {guid|path} 定位目标资产，guid 优先."
+          },
+          "targetGuid": {
+            "type": "string",
+            "aliases": [
+              "target_guid",
+              "guid"
+            ]
+          },
+          "targetPath": {
+            "type": "string",
+            "aliases": [
+              "target_path"
+            ]
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "dry_run"
+            ],
+            "description": "action=modify: 只校验不写盘."
+          },
+          "patches": {
+            "type": "array",
+            "description": "补丁数组，每项含 propertyPath、op 与 value。",
+            "items": {
+              "type": "object"
+            }
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "texture",
+      "summary": "Create and edit texture assets: fill, sprite, modify, delete, pattern, gradient, noise and import settings.",
+      "requiresEditor": true,
+      "requiredMode": "edit",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "project.assets.write"
+      ],
+      "surface": "core",
+      "actions": [
+        {
+          "name": "create",
+          "summary": "Create a texture from a fill colour, a pattern, explicit pixels or an image file."
+        },
+        {
+          "name": "create_sprite",
+          "summary": "Create a texture and configure it as a Sprite."
+        },
+        {
+          "name": "modify",
+          "summary": "Edit a pixel region and/or change the import settings of an existing texture."
+        },
+        {
+          "name": "delete",
+          "summary": "Delete a texture asset. Requires force=true."
+        },
+        {
+          "name": "apply_pattern",
+          "summary": "Rewrite a texture with a checker / stripes / grid / dots / brick pattern."
+        },
+        {
+          "name": "apply_gradient",
+          "summary": "Rewrite a texture with a linear or radial gradient."
+        },
+        {
+          "name": "apply_noise",
+          "summary": "Rewrite a texture with perlin or value noise."
+        },
+        {
+          "name": "set_import_settings",
+          "summary": "Write TextureImporter settings on an existing texture."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "create_sprite",
+              "modify",
+              "delete",
+              "apply_pattern",
+              "apply_gradient",
+              "apply_noise",
+              "set_import_settings"
+            ],
+            "default": "create"
+          },
+          "path": {
+            "type": "string",
+            "description": "资产路径，会自动补 Assets/ 前缀。"
+          },
+          "width": {
+            "type": "integer",
+            "default": 64,
+            "maximum": 4096
+          },
+          "height": {
+            "type": "integer",
+            "default": 64,
+            "maximum": 4096
+          },
+          "imagePath": {
+            "type": "string",
+            "aliases": [
+              "image_path"
+            ],
+            "description": "从磁盘图片加载（绝对路径或相对工程根）。"
+          },
+          "fillColor": {
+            "description": "底色：[r,g,b(,a)]，0-255 整数或 0-1 浮点。"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "checker / checkerboard / stripes / stripes_v / stripes_h / stripes_diag / dots / grid / brick。"
+          },
+          "patternSize": {
+            "type": "integer",
+            "default": 8,
+            "aliases": [
+              "pattern_size"
+            ]
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "array"
+            },
+            "description": "调色板，每项 [r,g,b(,a)]。"
+          },
+          "pixels": {
+            "description": "整图逐像素：颜色数组，或以 base64: 前缀给出的原始 RGBA32 字节。"
+          },
+          "gradientType": {
+            "type": "string",
+            "default": "linear",
+            "aliases": [
+              "gradient_type"
+            ],
+            "description": "linear 或 radial。"
+          },
+          "gradientAngle": {
+            "type": "number",
+            "default": 0,
+            "aliases": [
+              "gradient_angle"
+            ],
+            "description": "linear 渐变角度（度）。"
+          },
+          "gradient": {
+            "type": "object",
+            "description": "{colorKeys|keys|colors+stops, alphaKeys, mode}。"
+          },
+          "noiseType": {
+            "type": "string",
+            "default": "perlin",
+            "aliases": [
+              "noise_type"
+            ],
+            "description": "perlin 或 value。"
+          },
+          "noiseScale": {
+            "type": "number",
+            "default": 0.1,
+            "aliases": [
+              "noise_scale"
+            ],
+            "description": "Perlin 采样缩放。"
+          },
+          "octaves": {
+            "type": "integer",
+            "default": 1
+          },
+          "seed": {
+            "type": "integer",
+            "default": 0
+          },
+          "strength": {
+            "type": "number",
+            "default": 1.0,
+            "description": "噪声对比强度。"
+          },
+          "importSettings": {
+            "type": "object",
+            "aliases": [
+              "import_settings"
+            ]
+          },
+          "filterMode": {
+            "type": "string",
+            "aliases": [
+              "filter_mode"
+            ],
+            "description": "action=set_import_settings：简写，写入 importSettings.filterMode。"
+          },
+          "spriteSettings": {
+            "description": "{pivot, pixelsPerUnit}；旧版 Sprite 设置入口。"
+          },
+          "asSprite": {
+            "type": "boolean",
+            "default": false,
+            "aliases": [
+              "as_sprite"
+            ]
+          },
+          "setPixels": {
+            "type": "object",
+            "aliases": [
+              "set_pixels"
+            ],
+            "description": "action=modify: {x,y,width,height,color|pixels}。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=delete: 必须显式确认。"
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          }
+        }
+      }
+    }
+  ]
+}

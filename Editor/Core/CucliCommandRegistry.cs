@@ -240,8 +240,46 @@ namespace CustomUnityCli.Editor
                 OptionalPackage = string.IsNullOrWhiteSpace(command.OptionalPackage)
                     ? null
                     : command.OptionalPackage,
-                Surface = SurfaceName(command.Surface)
+                Surface = SurfaceName(command.Surface),
+                RegistryModule = fromPackage
+                    ? RegistryModuleOf(type, SurfaceName(command.Surface))
+                    : null
             };
+        }
+
+        /// <summary>
+        /// Maps a package command onto a <c>commands/modules/*.json</c> shard.
+        ///
+        /// The id follows the folder under <c>Editor/Commands/</c>:
+        /// <c>Core/Assets/AssetCommand.cs</c> becomes <c>core-assets</c>, while a file sitting
+        /// directly in <c>Core/</c> lands in <c>core</c>. That is the same split agents read.
+        /// </summary>
+        internal static string RegistryModuleOf(Type type, string surface)
+        {
+            string path = type == null ? null : CucliExtensions.SourcePathOf(type);
+            if (!string.IsNullOrEmpty(path))
+            {
+                string normalized = path.Replace('\\', '/');
+                const string Marker = "/Editor/Commands/";
+                int index = normalized.IndexOf(Marker, StringComparison.OrdinalIgnoreCase);
+                if (index >= 0)
+                {
+                    string relative = normalized.Substring(index + Marker.Length);
+                    string[] parts = relative.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2)
+                    {
+                        string layer = parts[0].ToLowerInvariant();
+                        if (parts.Length >= 3)
+                        {
+                            return layer + "-" + parts[1].ToLowerInvariant();
+                        }
+
+                        return layer;
+                    }
+                }
+            }
+
+            return string.IsNullOrWhiteSpace(surface) ? "core" : surface.Trim().ToLowerInvariant();
         }
 
         /// <summary>

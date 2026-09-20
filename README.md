@@ -281,11 +281,11 @@ can query the result later.
 ## Design rules this tool follows
 
 1. **No per-project configuration.** Aliases, offline groups and safety metadata ship in
-   `commands/registry.json`; everything else is discovered from the compiled Editor. There is no
-   settings dialog and no `.cuclirc` to write.
-2. **Configure once, in static files.** `commands/registry.json` is regenerated from the compiled
-   worker by `cucli commands export`, so the offline catalog can never drift silently —
-   `cucli doctor` compares the two hashes and tells you when they differ.
+   `commands/registry.json` and `commands/modules/*.json`; everything else is discovered from the
+   compiled Editor. There is no settings dialog and no `.cuclirc` to write.
+2. **Configure once, in static files.** `commands/registry.json` plus `commands/modules/` are
+   regenerated from the compiled worker by `cucli commands export`, so the offline catalog can never
+   drift silently — `cucli doctor` compares the two hashes and tells you when they differ.
 3. **Bounded output by default.** Every listing is paged (`pageSize` ≤ 500, opaque `nextCursor`) and
    every object dump is depth- and item-limited. A raw `TextMeshProUGUI` or `Mesh` dump would emit
    megabytes; this tool refuses to.
@@ -371,7 +371,7 @@ location, and a handful of alternative folder names are discovered if the first 
 | Mechanism | What it guarantees |
 | --- | --- |
 | Provenance tagging | Every command is tagged `source: package` or `source: project`, derived from the assembly it was compiled into. `cucli commands list` shows which is which. |
-| `cucli commands export` | Writes **package commands only** into `commands/registry.json`. Project commands go to `registry.local.json` beside the extension area instead, where they belong to the project's own repository. |
+| `cucli commands export` | Writes **package commands only** into `commands/registry.json` and `commands/modules/`. Project commands go to `registry.local.json` beside the extension area instead, where they belong to the project's own repository. |
 | Two catalog hashes | `catalogHash` covers package commands, `fullCatalogHash` covers everything. Drift detection therefore keeps working in a project that has grown its own commands. |
 | `cucli meta verify` | Validates the extension area, checks every command's action list against its declared JSON schema, and reports any source dropped **inside** the package tree — the one arrangement that would leak. |
 | `cucli meta extensions` | Reconciliation report: which groups came from the package, which from the project, and whether the local registry is stale. |
@@ -393,7 +393,8 @@ the `Notes/` folder that lets the next iteration start from what the last one le
 ```text
 Assets/Plugins/CustomUnityCli/          the repository root is the package root
 ├── package.json                        UPM metadata
-├── commands/registry.json              static command declaration (offline catalog + aliases)
+├── commands/registry.json              catalog index (aliases, offline groups, includes)
+├── commands/modules/                   exported Editor groups, one JSON per Commands folder
 ├── Editor/
 │   ├── CustomUnityCli.Editor.asmdef
 │   ├── Core/                           protocol, job queue, console capture, reflection helpers

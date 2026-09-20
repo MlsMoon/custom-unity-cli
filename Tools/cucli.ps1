@@ -273,8 +273,37 @@ function Get-RuntimeRoot {
 }
 
 function Get-StaticRegistry {
-    $path = Join-Path (Get-PackageRoot) 'commands/registry.json'
-    return Read-JsonFile $path
+    <#
+        Shipped package catalog. commands/registry.json is the index (aliases, offline groups,
+        controlActions). Package Editor groups live in commands/modules/*.json and are merged
+        here so callers keep seeing a single .groups array. An older monolithic registry.json
+        that still inlines .groups keeps working.
+    #>
+    $root = Get-PackageRoot
+    $path = Join-Path $root 'commands/registry.json'
+    $registry = Read-JsonFile $path
+    if ($null -eq $registry) { return $null }
+
+    $groups = New-Object System.Collections.Generic.List[object]
+    if ($registry.PSObject.Properties['includes'] -and $registry.includes) {
+        $commandsDir = Join-Path $root 'commands'
+        foreach ($relative in @($registry.includes)) {
+            $name = [string]$relative
+            if ([string]::IsNullOrWhiteSpace($name)) { continue }
+            $includePath = Join-Path $commandsDir ($name -replace '/', [IO.Path]::DirectorySeparatorChar)
+            $module = Read-JsonFile $includePath
+            if ($null -eq $module -or -not $module.groups) { continue }
+            foreach ($group in @($module.groups)) { $groups.Add($group) }
+        }
+    }
+    if ($registry.PSObject.Properties['groups'] -and $registry.groups) {
+        foreach ($group in @($registry.groups)) { $groups.Add($group) }
+    }
+    if ($groups.Count -gt 0) {
+        $registry | Add-Member -NotePropertyName groups -NotePropertyValue $groups.ToArray() -Force
+    }
+
+    return $registry
 }
 
 function Get-ExtensionRoot {
@@ -1065,7 +1094,7 @@ function Get-GroupIndex {
         Builds the group -> metadata index the dispatcher needs.
 
         Precedence, lowest to highest:
-          1. the shipped commands/registry.json  (package commands, always present)
+          1. the shipped catalog (commands/registry.json + commands/modules/*.json)
           2. the project-local registry.local.json (project commands; only from the extension area)
           3. the live worker catalog              (authoritative while Unity is open)
 

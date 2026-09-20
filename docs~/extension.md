@@ -364,6 +364,7 @@ Rules the worker relies on:
 ./cucli.ps1 commands export
 ```
 
-This reads `worker/commands.json` and rewrites `commands/registry.json`, preserving the
+This reads `worker/commands.json` and rewrites `commands/registry.json` plus
+`commands/modules/*.json` (one shard per `Editor/Commands` folder), preserving the
 hand-maintained `aliases`, `offline`, `controlActions` and `description` sections. Run it after
 adding or renaming a command, then `./cucli.ps1 doctor` should report no `registry.drift`.

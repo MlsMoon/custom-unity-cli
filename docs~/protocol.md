@@ -236,7 +236,8 @@ Two files describe the same surface, and `cucli doctor` compares them.
 | File | Written by | Used for |
 | --- | --- | --- |
 | `worker/commands.json` | the Editor, on every domain reload | authoritative; dispatch validation and `commands list` while Unity is open |
-| `commands/registry.json` | `cucli commands export` | offline `commands list` / `describe`, plus the hand-maintained `aliases`, `offline` and `controlActions` sections |
+| `commands/registry.json` | `cucli commands export` | index: aliases, offline groups, `controlActions`, `catalogHash`, and `includes` |
+| `commands/modules/*.json` | `cucli commands export` | package Editor groups, one shard per `Editor/Commands` folder, merged by the CLI while Unity is closed |
 
 Both carry a `catalogHash`: a SHA-256 over the machine-relevant fields of each command (name, mode,
 flags, optional package, surface, effects, action names, normalised parameter schema — **not** prose

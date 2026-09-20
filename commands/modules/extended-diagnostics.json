@@ -1,0 +1,614 @@
+{
+  "schemaVersion": "cucli.command-registry-module/v1",
+  "module": "extended-diagnostics",
+  "groups": [
+    {
+      "name": "code",
+      "summary": "Execute a C# snippet, batch several command operations in one round trip, or run a menu item.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": true,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.code.execute",
+        "project.assets.write",
+        "editor.state.write"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "run",
+          "summary": "Compile and invoke a C# method body, returning its value as JSON."
+        },
+        {
+          "name": "batch",
+          "summary": "Run several registered command operations in one round trip."
+        },
+        {
+          "name": "menu",
+          "summary": "Execute a menu item by its exact path."
+        },
+        {
+          "name": "history",
+          "summary": "List recently executed snippets."
+        },
+        {
+          "name": "clear-history",
+          "summary": "Delete the snippet history."
+        },
+        {
+          "name": "replay",
+          "summary": "Re-run a snippet from history by index."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "run",
+              "batch",
+              "menu",
+              "history",
+              "clear-history",
+              "replay"
+            ],
+            "default": "run"
+          },
+          "code": {
+            "type": "string",
+            "description": "action=run: the BODY of 'public static object Execute()'. Return a value to receive it as JSON."
+          },
+          "file": {
+            "type": "string",
+            "description": "action=run: read the snippet from a file instead of 'code'."
+          },
+          "safetyChecks": {
+            "type": "boolean",
+            "default": true,
+            "description": "Substring blacklist only; NOT a sandbox."
+          },
+          "compiler": {
+            "type": "string",
+            "enum": [
+              "codedom"
+            ],
+            "default": "codedom"
+          },
+          "operations": {
+            "type": "array",
+            "description": "action=batch: [{ command, action, args }] or MCP-style [{ tool, params }].",
+            "items": {
+              "type": "object"
+            }
+          },
+          "failFast": {
+            "type": "boolean",
+            "default": false
+          },
+          "menuPath": {
+            "type": "string"
+          },
+          "index": {
+            "type": "integer",
+            "description": "action=replay: history index."
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20
+          }
+        }
+      }
+    },
+    {
+      "name": "memory",
+      "summary": "Read-only asset and object audits: dangling references, reverse references, duplicate content, unreachable assets.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "project.assets.read",
+        "editor.memory.read"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "audit",
+          "summary": "Scan assets for dangling serialized references and report counts by asset type."
+        },
+        {
+          "name": "objects",
+          "summary": "Count loaded objects by type and estimate their memory, largest first."
+        },
+        {
+          "name": "references",
+          "summary": "Find which assets reference a given asset, plus its own dependency count."
+        },
+        {
+          "name": "deps",
+          "summary": "List what a given asset depends on, transitively by default."
+        },
+        {
+          "name": "duplicates",
+          "summary": "Group assets whose content fingerprint is identical."
+        },
+        {
+          "name": "unused",
+          "summary": "List assets that no scene or prefab in the project reaches (candidates, not a verdict)."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "audit",
+              "objects",
+              "references",
+              "deps",
+              "duplicates",
+              "unused"
+            ],
+            "default": "audit"
+          },
+          "path": {
+            "type": "string",
+            "description": "action=references: the asset to find referencers of.",
+            "aliases": [
+              "assetPath",
+              "asset_path"
+            ]
+          },
+          "folder": {
+            "type": "string",
+            "description": "Restrict the scan to this folder. Defaults to Assets.",
+            "aliases": [
+              "root",
+              "scope"
+            ]
+          },
+          "typeName": {
+            "type": "string",
+            "description": "action=objects: only count loaded objects of this type.",
+            "aliases": [
+              "type_name",
+              "type"
+            ]
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "memory",
+              "count",
+              "name"
+            ],
+            "default": "memory",
+            "aliases": [
+              "sort_by"
+            ]
+          },
+          "maxScan": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20000,
+            "default": 500,
+            "description": "How many assets a scan may examine before it reports truncation.",
+            "aliases": [
+              "max_scan"
+            ]
+          },
+          "minSize": {
+            "type": "integer",
+            "default": 1024,
+            "description": "action=duplicates: ignore files smaller than this many bytes.",
+            "aliases": [
+              "min_size"
+            ]
+          },
+          "allScenes": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=unused: use every scene in the project, not just the enabled build scenes.",
+            "aliases": [
+              "all_scenes"
+            ]
+          },
+          "includeEmpty": {
+            "type": "boolean",
+            "default": false,
+            "description": "action=objects: include types with zero loaded instances.",
+            "aliases": [
+              "include_empty"
+            ]
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50,
+            "aliases": [
+              "page_size",
+              "limit"
+            ]
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "aliases": [
+              "page_number"
+            ]
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          },
+          "maxStringLength": {
+            "type": "integer",
+            "default": 4096,
+            "aliases": [
+              "max_string_length"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "profiler",
+      "summary": "Unity Profiler：会话开关与还原、帧计时、计数器（分页）、对象内存、内存快照、Frame Debugger。",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.profiler.read",
+        "editor.profiler.write",
+        "filesystem.write"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "status",
+          "summary": "报告 Profiler 与各 area 的当前开关状态，以及是否有可还原的会话快照。"
+        },
+        {
+          "name": "ping",
+          "summary": "连通性探测。"
+        },
+        {
+          "name": "start",
+          "summary": "开启 Profiler；可选写二进制日志与采集分配调用栈。开始前会记录原状态。"
+        },
+        {
+          "name": "stop",
+          "summary": "关闭 Profiler 并还原 start 之前的状态，避免污染下一次采样。"
+        },
+        {
+          "name": "set-areas",
+          "summary": "按 ProfilerArea 枚举名逐项开关采集区域。"
+        },
+        {
+          "name": "frame-timing",
+          "summary": "读取最近一帧的 CPU/GPU 帧计时；未开启 Frame Timing Stats 时给出可诊断说明。"
+        },
+        {
+          "name": "counters",
+          "summary": "读取某个 ProfilerCategory 下的计数器（分页 + 名称过滤 + 扫描上限）。"
+        },
+        {
+          "name": "object-memory",
+          "summary": "按场景层级路径或资产路径查询单个对象的运行时内存占用。"
+        },
+        {
+          "name": "snapshot-take",
+          "summary": "用 Memory Profiler 包抓取 .snap 快照（异步 + 超时 + 取消）。"
+        },
+        {
+          "name": "snapshot-list",
+          "summary": "列出 .snap 快照文件及其大小与创建时间（分页）。"
+        },
+        {
+          "name": "snapshot-compare",
+          "summary": "比较两个快照的文件级元数据（不做对象级 diff）。"
+        },
+        {
+          "name": "frame-debugger-enable",
+          "summary": "开启 Frame Debugger；Play Mode 未暂停时拒绝并提示先暂停。"
+        },
+        {
+          "name": "frame-debugger-disable",
+          "summary": "关闭 Frame Debugger。"
+        },
+        {
+          "name": "frame-debugger-events",
+          "summary": "按游标分页读取 Frame Debugger 事件列表。"
+        },
+        {
+          "name": "profiler_status",
+          "summary": "Alias of status (MCP spelling)."
+        },
+        {
+          "name": "profiler_start",
+          "summary": "Alias of start (MCP spelling)."
+        },
+        {
+          "name": "profiler_stop",
+          "summary": "Alias of stop (MCP spelling)."
+        },
+        {
+          "name": "profiler_set_areas",
+          "summary": "Alias of set-areas (MCP spelling)."
+        },
+        {
+          "name": "get_frame_timing",
+          "summary": "Alias of frame-timing (MCP spelling)."
+        },
+        {
+          "name": "get_counters",
+          "summary": "Alias of counters (MCP spelling)."
+        },
+        {
+          "name": "get_object_memory",
+          "summary": "Alias of object-memory (MCP spelling)."
+        },
+        {
+          "name": "memory_take_snapshot",
+          "summary": "Alias of snapshot-take (MCP spelling)."
+        },
+        {
+          "name": "memory_list_snapshots",
+          "summary": "Alias of snapshot-list (MCP spelling)."
+        },
+        {
+          "name": "memory_compare_snapshots",
+          "summary": "Alias of snapshot-compare (MCP spelling)."
+        },
+        {
+          "name": "frame_debugger_enable",
+          "summary": "Alias of frame-debugger-enable (MCP spelling)."
+        },
+        {
+          "name": "frame_debugger_disable",
+          "summary": "Alias of frame-debugger-disable (MCP spelling)."
+        },
+        {
+          "name": "frame_debugger_get_events",
+          "summary": "Alias of frame-debugger-events (MCP spelling)."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "ping",
+              "start",
+              "stop",
+              "set-areas",
+              "frame-timing",
+              "counters",
+              "object-memory",
+              "snapshot-take",
+              "snapshot-list",
+              "snapshot-compare",
+              "frame-debugger-enable",
+              "frame-debugger-disable",
+              "frame-debugger-events",
+              "profiler_status",
+              "profiler_start",
+              "profiler_stop",
+              "profiler_set_areas",
+              "get_frame_timing",
+              "get_counters",
+              "get_object_memory",
+              "memory_take_snapshot",
+              "memory_list_snapshots",
+              "memory_compare_snapshots",
+              "frame_debugger_enable",
+              "frame_debugger_disable",
+              "frame_debugger_get_events"
+            ],
+            "default": "status"
+          },
+          "logFile": {
+            "type": "string",
+            "description": "start: 二进制日志输出路径；目录必须已存在。也接受 log_file."
+          },
+          "enableCallstacks": {
+            "type": "boolean",
+            "default": false,
+            "description": "start: 采集分配调用栈。也接受 enable_callstacks."
+          },
+          "areas": {
+            "type": "object",
+            "description": "set-areas: 键为 ProfilerArea 枚举名（大小写不敏感），值为布尔。例如把 CPU 设为 true、GPU 设为 false。"
+          },
+          "category": {
+            "type": "string",
+            "description": "counters: ProfilerCategory 名，如 Render / Scripts / Memory / Physics。"
+          },
+          "counters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "counters: 只看名称包含这些子串的计数器；省略则按名称顺序取前 maxCounters 个。"
+          },
+          "maxCounters": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096,
+            "default": 256,
+            "description": "counters: 扫描上限；命中更多时会标记 scanTruncated。也接受 max_counters."
+          },
+          "objectPath": {
+            "type": "string",
+            "description": "object-memory: 场景层级路径或资产路径。也接受 object_path."
+          },
+          "snapshotPath": {
+            "type": "string",
+            "description": "snapshot-take: 输出 .snap 路径；省略则写入临时缓存目录。也接受 snapshot_path."
+          },
+          "searchPath": {
+            "type": "string",
+            "description": "snapshot-list: 搜索目录；省略则搜临时缓存与工程根两处。也接受 search_path."
+          },
+          "snapshotA": {
+            "type": "string",
+            "description": "snapshot-compare: 第一个快照文件。也接受 snapshot_a."
+          },
+          "snapshotB": {
+            "type": "string",
+            "description": "snapshot-compare: 第二个快照文件。也接受 snapshot_b."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 32,
+            "description": "也接受 page_size."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "frame-debugger-events: 起始偏移（整数）。"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "pageSize 的别名。"
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 30,
+            "description": "snapshot-take: 等待快照完成的秒数。也接受 timeout_seconds."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 64
+          },
+          "maxDepth": {
+            "type": "integer",
+            "default": 4
+          }
+        }
+      }
+    },
+    {
+      "name": "reflect",
+      "summary": "Look up loaded types, their members and their signatures. Answers come from this Editor's real assemblies.",
+      "requiresEditor": true,
+      "requiredMode": "any",
+      "mutatesProject": false,
+      "mayReloadDomain": false,
+      "optionalPackage": null,
+      "effects": [
+        "editor.state.read"
+      ],
+      "surface": "extended",
+      "actions": [
+        {
+          "name": "get-type",
+          "summary": "Describe one type: kind, namespace, assembly and the members it declares itself."
+        },
+        {
+          "name": "get-member",
+          "summary": "Resolve a single member by name, searching base types."
+        },
+        {
+          "name": "search",
+          "summary": "Find types and members whose name contains a fragment (capped, paged)."
+        }
+      ],
+      "parametersSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "get-type",
+              "get-member",
+              "search"
+            ],
+            "default": "get-type"
+          },
+          "typeName": {
+            "type": "string",
+            "description": "get-type / get-member: short or fully qualified type name."
+          },
+          "memberName": {
+            "type": "string",
+            "description": "get-member: member to resolve, searched up the base chain."
+          },
+          "query": {
+            "type": "string",
+            "description": "search: case-insensitive name fragment."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "any",
+              "type",
+              "method",
+              "property",
+              "field",
+              "event"
+            ],
+            "default": "any"
+          },
+          "includeInherited": {
+            "type": "boolean",
+            "default": false,
+            "description": "get-type: include members inherited from base types. False by default, matching MCP; pass true (or declaredOnly: false) for the full callable surface."
+          },
+          "declaredOnly": {
+            "type": "boolean",
+            "default": true,
+            "description": "get-type: list only the members this type declares itself. True by default, matching MCP's get_type."
+          },
+          "includeNoisy": {
+            "type": "boolean",
+            "default": false,
+            "description": "get-type: include hideFlags/runInEditMode and friends."
+          },
+          "maxItems": {
+            "type": "integer",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 500
+          },
+          "pageSize": {
+            "type": "integer",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 500
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Opaque cursor from a previous page."
+          }
+        }
+      }
+    }
+  ]
+}

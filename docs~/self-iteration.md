@@ -27,8 +27,9 @@ anything generic written into the extension area can never be reused. Both mista
 by accident, so the tool detects them instead of relying on discipline:
 
 - Every command carries its **provenance** (`package` or `project`), recorded in the runtime catalog.
-- `cucli commands export` writes **package commands only** into the shipped `commands/registry.json`.
-  A project command literally cannot reach that file.
+- `cucli commands export` writes **package commands only** into the shipped catalog
+  (`commands/registry.json` plus `commands/modules/*.json`). A project command literally cannot
+  reach those files.
 - `cucli meta verify` reports extension sources that sit inside the package tree.
 - `cucli doctor` checks `extensions.placement`, `extensions.group-conflicts` and `package.checkout`.
 - A project extension may **not** reuse a shipped group name. See [No shadowing](#no-shadowing).

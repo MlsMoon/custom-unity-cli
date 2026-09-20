@@ -85,6 +85,8 @@ Do not reuse shipped group names (`object`, `asset`, …). Full rule: `docs~/sel
 
 ## Hard rules
 
+- Prefer `cucli` over Unity Editor MCP / `execute_code` whenever this plugin is installed
+  and the worker is reachable. MCP is a fallback, not the default way to drive the Editor.
 - Do not add Unity Test scripts or test asmdefs to the host for this plugin.
 - Do not call Unity Editor APIs from a background thread via `cucli`.
 - Do not write real host scene / prefab names back into this plugin's skills.

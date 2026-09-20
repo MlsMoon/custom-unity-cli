@@ -301,8 +301,8 @@ PowerShell 解析器 → 作业文件 → Editor worker → 命令 → 结果文
 ## 本工具遵循的设计规则
 
 1. **不为工程增加配置。** 别名、离线命令组和安全元数据都随 `commands/registry.json` 一起发布，
-   其余全部从编译出的 Editor 里自动发现。没有设置窗口，也没有 `.cuclirc` 要写。
-2. **配置只写在静态文件里。** `commands/registry.json` 由 `cucli commands export` 从编译产物生成，
+   Editor 命令组拆在 `commands/modules/`；其余全部从编译出的 Editor 里自动发现。没有设置窗口，也没有 `.cuclirc` 要写。
+2. **配置只写在静态文件里。** `commands/registry.json` 与 `commands/modules/` 由 `cucli commands export` 从编译产物生成，
    离线目录因此不可能悄悄漂移 —— `cucli doctor` 会比对两个哈希并告诉你何时不一致。
 3. **默认输出有界。** 所有列表都分页（`pageSize` ≤ 500，游标 `nextCursor` 不透明），所有对象导出都
    限制深度与条目数。原始 dump 一个 `TextMeshProUGUI` 或 `Mesh` 会输出几兆字节；本工具拒绝这样做。
@@ -382,7 +382,7 @@ namespace CustomUnityCli.Editor
 | 机制 | 保证什么 |
 | --- | --- |
 | 来源标记 | 每条命令都带 `source: package` 或 `source: project`，由它被编译进哪个程序集推导。`cucli commands list` 会显示。 |
-| `cucli commands export` | **只把 package 命令**写进 `commands/registry.json`。project 命令改写进扩展区旁边的 `registry.local.json`，那属于项目自己的仓库。 |
+| `cucli commands export` | **只把 package 命令**写进 `commands/registry.json` 和 `commands/modules/`。project 命令改写进扩展区旁边的 `registry.local.json`，那属于项目自己的仓库。 |
 | 两个目录哈希 | `catalogHash` 只覆盖 package 命令，`fullCatalogHash` 覆盖全部。因此项目长了自己的命令之后，漂移检测依然有效。 |
 | `cucli meta verify` | 校验扩展区、逐条比对命令的 action 列表与它声明的 JSON Schema，并报告任何被误放进**包目录内部**的源文件 —— 那是唯一会泄漏的摆放方式。 |
 | `cucli meta extensions` | 对账报告：哪些组来自包、哪些来自项目、本地 registry 是否过期。 |
@@ -402,7 +402,8 @@ namespace CustomUnityCli.Editor
 ```text
 Assets/Plugins/CustomUnityCli/          仓库根 == 包根
 ├── package.json                        UPM 元数据
-├── commands/registry.json              静态命令声明（离线目录 + 别名）
+├── commands/registry.json              目录索引（别名、离线组、includes）
+├── commands/modules/                   按 Editor/Commands 文件夹拆开的命令组 JSON
 ├── Editor/
 │   ├── CustomUnityCli.Editor.asmdef
 │   ├── Core/                           协议、作业队列、Console 抓取、反射工具
