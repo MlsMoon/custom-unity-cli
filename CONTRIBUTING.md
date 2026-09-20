@@ -4,7 +4,7 @@ This repository is the Unity package root for `com.igp.custom-unity-cli`.
 
 ## Development
 
-Agent instructions live in [`.agents/skills/custom-unity-cli/SKILL.md`](.agents/skills/custom-unity-cli/SKILL.md). Longer design notes live in [`docs~/`](docs~/).
+Agent instructions live in [`Skills~/cucli-develop-plugin/SKILL.md`](Skills~/cucli-develop-plugin/SKILL.md). Longer design notes live in [`docs~/`](docs~/). Host integration: [`Skills~/cucli-use-plugin/SKILL.md`](Skills~/cucli-use-plugin/SKILL.md).
 
 ```powershell
 Tools/verify.ps1              # manifest, .meta coverage, command contract, offline Roslyn compile

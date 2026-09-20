@@ -1,0 +1,4 @@
+interface:
+  display_name: "Custom Unity CLI: Develop the Plugin"
+  short_description: "Edit CustomUnityCli Editor/CLI: command groups, worker, verify.ps1, English commits."
+  default_prompt: "Read AGENTS.md and $cucli-develop-plugin before editing this package. Stay in the nested git root. Run Tools/verify.ps1. Do not put host commands in this folder."

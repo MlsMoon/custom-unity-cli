@@ -23,6 +23,12 @@ First public release.
 
 ### Added
 
+**Agent routing**
+
+- `.mlsmoon/skill.json` (`kind: routing`, id `custom-unity-cli-skill`) plus `Skills~/` use/develop
+  skills for Moon Game Dev Tool Manager. Host agents get a thin router; they must not copy `Skills~/`
+  into `.agents/skills` as standalone skills.
+
 **Transport and worker**
 
 - File-queue job system under `Library/CustomUnityCli/` with `control`, `queued`, `running`,

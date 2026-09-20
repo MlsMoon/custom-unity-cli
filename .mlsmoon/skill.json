@@ -1,0 +1,16 @@
+{
+  "id": "custom-unity-cli-skill",
+  "kind": "routing",
+  "name": "custom-unity-cli-skill",
+  "parentId": "custom-unity-cli",
+  "routes": [
+    {
+      "title": "Use the plugin",
+      "path": "Skills~/cucli-use-plugin/SKILL.md"
+    },
+    {
+      "title": "Develop the plugin",
+      "path": "Skills~/cucli-develop-plugin/SKILL.md"
+    }
+  ]
+}

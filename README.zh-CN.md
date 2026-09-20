@@ -260,7 +260,8 @@ git clone https://github.com/MlsMoon/custom-unity-cli.git Assets/Plugins/CustomU
 
 ## 验证与自测
 
-本仓库的 Agent 维护说明见 [`.agents/skills/custom-unity-cli/SKILL.md`](.agents/skills/custom-unity-cli/SKILL.md)。
+本仓库的 Agent 维护说明见 [`Skills~/cucli-develop-plugin/SKILL.md`](Skills~/cucli-develop-plugin/SKILL.md)。
+宿主集成见 [`Skills~/cucli-use-plugin/SKILL.md`](Skills~/cucli-use-plugin/SKILL.md)。入口是 [`AGENTS.md`](AGENTS.md)。
 **Git 提交说明只用英文**（Conventional Commits：`type(scope): imperative summary`），不要写中文 commit message。
 
 两个工具回答两个不同的问题，都不需要关掉你的 Editor。
@@ -407,6 +408,9 @@ Assets/Plugins/CustomUnityCli/          仓库根 == 包根
 │   ├── Core/                           协议、作业队列、Console 抓取、反射工具
 │   └── Commands/                       命令组，一组一个文件
 ├── Tools/cucli.ps1                     整个 CLI：参数解析、离线命令、作业传输
+├── .mlsmoon/                           Moon Game Dev Tool Manager 路由 Skill
+├── Skills~/                            Agent skill（以 ~ 结尾，Unity 不会导入）
+├── AGENTS.md                           Agent 入口
 └── docs~/                              包文档（以 ~ 结尾的目录 Unity 不会导入）
 ```
 

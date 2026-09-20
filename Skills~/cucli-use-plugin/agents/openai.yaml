@@ -1,0 +1,4 @@
+interface:
+  display_name: "Custom Unity CLI: Use the Plugin"
+  short_description: "Install CustomUnityCli, run cucli, doctor the worker, and scaffold host extensions."
+  default_prompt: "Read AGENTS.md and $cucli-use-plugin before driving Unity from a terminal or adding CustomUnityCli.Extensions. Unity 6 is out of scope."

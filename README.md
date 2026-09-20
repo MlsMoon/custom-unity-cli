@@ -23,6 +23,10 @@ whole Editor becomes scriptable.
 
 [中文说明见 `README.zh-CN.md`](README.zh-CN.md)
 
+**Agents:** start at [`AGENTS.md`](AGENTS.md). Skills (Unity-ignored) live in [`Skills~/`](Skills~/README.md). Machine-readable index: [`llms.txt`](llms.txt). Do not invent APIs from older README copies — `AGENTS.md` is the current-contract override.
+
+Moon Game Dev Tool Manager catalog id: `custom-unity-cli`.
+
 ## Contents
 
 - [Compatibility](#compatibility--read-this-first)
@@ -395,6 +399,9 @@ Assets/Plugins/CustomUnityCli/          the repository root is the package root
 │   ├── Core/                           protocol, job queue, console capture, reflection helpers
 │   └── Commands/                       command groups, one file per group
 ├── Tools/cucli.ps1                     the entire CLI: parser, offline commands, job transport
+├── .mlsmoon/                           routing skill for Moon Game Dev Tool Manager
+├── Skills~/                            agent skills (Unity ignores folders ending in ~)
+├── AGENTS.md                           agent entry
 └── docs~/                              package docs (Unity ignores folders ending in ~)
 ```
 
@@ -411,11 +418,14 @@ the folder stays read-only and upgradeable, and deleting `Library/CustomUnityCli
 - [`docs~/mcp-parity.md`](docs~/mcp-parity.md) — tool-by-tool mapping from MCP for Unity, and the
   deliberate differences.
 - [`CHANGELOG.md`](CHANGELOG.md)
+- [`AGENTS.md`](AGENTS.md) — agent router
+- [`Skills~/`](Skills~/README.md) — use vs develop skills (Unity-ignored)
 
 ## Developing this package
 
 Agent instructions for this repository live in
-[`.agents/skills/custom-unity-cli/SKILL.md`](.agents/skills/custom-unity-cli/SKILL.md).
+[`Skills~/cucli-develop-plugin/SKILL.md`](Skills~/cucli-develop-plugin/SKILL.md).
+Host integration: [`Skills~/cucli-use-plugin/SKILL.md`](Skills~/cucli-use-plugin/SKILL.md).
 
 **Commit messages are English only.** Use Conventional Commits
 (`type(scope): imperative summary`) with an English subject and body. Do not write

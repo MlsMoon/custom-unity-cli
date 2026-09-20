@@ -1,0 +1,4 @@
+interface:
+  display_name: "Custom Unity CLI: Host Router"
+  short_description: "Route to packaged use/develop skills. Do not store host-project facts here."
+  default_prompt: "Use $custom-unity-cli-skill only to pick a source skill. Edit Skills~/ contracts, not this router."

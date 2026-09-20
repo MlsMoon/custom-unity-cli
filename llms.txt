@@ -1,0 +1,25 @@
+# Custom Unity CLI
+
+> Zero-configuration CLI for Unity 2022.3. File-queue transport, no port, no MCP. Agent skills ship in Skills~/.
+
+This folder is a Unity editor plugin. When it lives under Assets/, Unity ignores `Skills~/`. Agents should start at AGENTS.md, then load the matching skill. Do not invent APIs from older README copies.
+
+## Start here
+
+- [AGENTS.md](AGENTS.md): router, hard rules, current contract
+- [Host router](.mlsmoon/project-skill/custom-unity-cli-skill/SKILL.md): pick a source skill; do not store host facts
+- [Use the plugin](Skills~/cucli-use-plugin/SKILL.md): install, cucli, doctor, host extensions
+- [Develop the plugin](Skills~/cucli-develop-plugin/SKILL.md): worker, command groups, verify
+- [README.md](README.md): human overview and installation
+
+## Contracts
+
+- [Host wiring (xx)](Skills~/cucli-use-plugin/references/host-integration-xx.md)
+- [Command groups](docs~/extension.md)
+- [File protocol](docs~/protocol.md)
+- [Project extensions](docs~/self-iteration.md)
+
+## Optional
+
+- [Changelog](CHANGELOG.md)
+- [简体中文](README.zh-CN.md)

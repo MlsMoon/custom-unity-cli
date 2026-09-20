@@ -1,43 +1,31 @@
 ---
-name: custom-unity-cli
-description: >
-  Maintain the custom-unity-cli package (Assets/Plugins/CustomUnityCli nested git).
-  Use when committing to this repo, writing changelog entries, running verify.ps1 or
-  cucli selftest, adding command groups, or changing the Editor worker / Tools/cucli.ps1.
-  Triggers: cucli, custom-unity-cli, git commit, commit message, verify.ps1, selftest.
+name: cucli-develop-plugin
+description: Maintain the Custom Unity CLI package (Assets/Plugins/CustomUnityCli nested git). Covers commits, changelog, verify.ps1, cucli selftest, command groups, and the Editor worker. Use when committing to this repo, adding command groups, or changing Tools/cucli.ps1.
 ---
 
-# Maintain custom-unity-cli
+# Custom Unity CLI: Develop the Plugin
+
+Maintenance guide for edits under this plugin root.
+
+Integration contracts live in the sibling skill `cucli-use-plugin`.
+Current-contract overrides: [`../../AGENTS.md`](../../AGENTS.md).
 
 This directory is its own git repository (`com.igp.custom-unity-cli`). Do not use Plastic
-`cm checkin` here. Host-project rules (Chinese Plastic messages, BilliardsBot skills) do
-not apply to commits in this repo.
+`cm checkin` here. Host-project rules do not apply to commits in this repo.
 
 ## Commit messages (English only)
 
-Write every git commit **in English**. Conventional Commits, English subject and body:
+Write every git commit **in English**. Conventional Commits:
 
 ```text
 type(scope): imperative summary in English
-
-Optional body: what changed and why, still English.
-Optional footer: Verified: ...
 ```
 
 - Allowed types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `perf`.
 - Scope is optional (`cli`, `worker`, `selftest`, `docs`).
 - Subject: imperative mood, ~72 characters, no trailing period.
-- **No Chinese** (or other non-English copy) in the subject or body. Runtime user-facing
-  command `message` strings in C# may stay bilingual; commit messages may not.
-- Do not copy BilliardsBot's `type(scope): 中文描述` convention into this repository.
-
-Examples:
-
-```text
-fix(cli): accept --path as a materialPath alias
-feat(cli): honour --force on scene load and close
-docs: require English Conventional Commit messages
-```
+- No Chinese in the subject or body. Runtime user-facing command `message`
+  strings in C# may stay bilingual; commit messages may not.
 
 ## Before you commit
 
@@ -60,6 +48,19 @@ docs: require English Conventional Commit messages
 - Target is Unity **2022.3**. Do not re-scope the manifest floor without an explicit
   support decision.
 
+## Architecture (where to look)
+
+```text
+Tools/cucli.ps1          CLI: parse, offline groups, job files
+Editor/Core/             protocol, queue, heartbeat, console capture
+Editor/Commands/Core/    stable command groups
+Editor/Commands/Extended extra groups (still shipped)
+commands/registry.json   exported offline catalog (package commands only)
+docs~/                   protocol, extension contract, self-iteration
+```
+
+Writing a new group: `docs~/extension.md`. File protocol: `docs~/protocol.md`.
+
 ## Verification
 
 ```powershell
@@ -69,3 +70,7 @@ Tools/verify.ps1
 # include Extended groups:
 ./Tools/cucli.ps1 selftest -Tier AB -IncludeExtended
 ```
+
+Do not add Unity Test scripts or test asmdefs in this package.
+`verify.ps1` is the build gate. `cucli selftest` is the behaviour gate.
+Do not start, focus, or disturb a running Editor to run the build gate.
