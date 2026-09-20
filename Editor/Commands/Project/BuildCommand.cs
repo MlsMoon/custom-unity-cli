@@ -105,7 +105,7 @@ namespace CustomUnityCli.Editor
     ""scriptingBackend"": { ""type"": ""string"", ""description"": ""action=build: mono or il2cpp."" },
     ""scripting_backend"": { ""type"": ""string"", ""description"": ""Alias of 'scriptingBackend'."" },
     ""profile"": { ""type"": ""string"", ""description"": ""action=build/profiles: named profile or a BuildProfile asset path."" },
-    ""property"": { ""type"": ""string"", ""description"": ""action=settings: product_name|company_name|version|bundle_id|scripting_backend|defines|architecture."" },
+    ""property"": { ""type"": ""string"", ""aliases"": [""key""], ""description"": ""action=settings: product_name|company_name|version|bundle_id|scripting_backend|defines|architecture。也接受 --key。"" },
     ""value"": { ""type"": ""string"", ""description"": ""action=settings: omit to read, provide to write."" },
     ""activate"": { ""type"": ""boolean"", ""default"": false, ""description"": ""action=profiles: activate the named profile."" },
     ""save"": { ""type"": ""boolean"", ""default"": false, ""description"": ""action=profiles: create or update the named profile."" },
@@ -298,7 +298,7 @@ namespace CustomUnityCli.Editor
 
         private static CucliCommandResult Settings(CucliCommandContext context)
         {
-            string property = context.Input.GetString("property");
+            string property = context.Input.GetFirstString("property", "key");
             if (string.IsNullOrWhiteSpace(property))
             {
                 return CucliCommandResult.Missing(

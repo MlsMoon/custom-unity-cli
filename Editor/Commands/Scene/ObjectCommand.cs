@@ -82,7 +82,7 @@ namespace CustomUnityCli.Editor
       ""type"": ""string"",
       ""enum"": [""by_id_or_name_or_path"", ""by_id"", ""by_name"", ""by_path"", ""by_tag"", ""by_layer"", ""by_component""],
       ""description"": ""寻址方式；find 默认 by_name。"" },
-    ""searchTerm"": { ""type"": ""string"", ""description"": ""action=find：搜索词（target 为兼容别名）。"" },
+    ""searchTerm"": { ""type"": ""string"", ""aliases"": [""search_term"", ""target"", ""name""], ""description"": ""action=find：搜索词（target / name 为兼容别名）。"" },
     ""includeInactive"": { ""type"": ""boolean"", ""default"": false, ""description"": ""action=find：是否包含 inactive（resolver 始终包含）。"" },
     ""parent"": { ""description"": ""action=create / modify / duplicate：父物体引用；空串或 null 表示移到根。"" },
     ""position"": { ""description"": ""action=create / modify 写 localPosition；duplicate 写世界 position。"" },
@@ -92,13 +92,13 @@ namespace CustomUnityCli.Editor
     ""layer"": { ""type"": ""string"", ""description"": ""层名或 0-31 的层索引。"" },
     ""setActive"": { ""type"": ""boolean"", ""description"": ""action=modify：设置 activeSelf。"" },
     ""isStatic"": { ""type"": ""boolean"", ""description"": ""action=modify：设置 StaticEditorFlags。"" },
-    ""primitiveType"": { ""type"": ""string"", ""description"": ""action=create：PrimitiveType 枚举名（Sphere / Capsule / Cylinder / Cube / Plane / Quad）。"" },
+    ""primitiveType"": { ""type"": ""string"", ""aliases"": [""primitive_type"", ""primitive""], ""description"": ""action=create：PrimitiveType 枚举名。也接受 --primitive。"" },
     ""prefabPath"": { ""type"": ""string"", ""description"": ""action=create：实例化来源 prefab；saveAsPrefab 时作为保存目标。"" },
     ""saveAsPrefab"": { ""type"": ""boolean"", ""default"": false, ""description"": ""action=create：把新物体存为 prefab。"" },
     ""componentsToAdd"": { ""type"": ""array"", ""items"": {}, ""description"": ""元素为类型名，或 { typeName, properties }。"" },
     ""componentsToRemove"": { ""type"": ""array"", ""items"": { ""type"": ""string"" } },
     ""componentProperties"": { ""description"": ""{ 组件名: { 属性: 值 } }，也接受 JSON 字符串。"" },
-    ""componentType"": { ""type"": ""string"", ""description"": ""组件类型名，支持全限定名。"" },
+    ""componentType"": { ""type"": ""string"", ""aliases"": [""component_type"", ""component"", ""type""], ""description"": ""组件类型名。也接受 --component。"" },
     ""componentIndex"": { ""type"": ""integer"", ""description"": ""同类型多实例时按 0 基索引操作。"" },
     ""properties"": { ""description"": ""action=add / set-property：{ 属性: 值 } 对象或 JSON 字符串。"" },
     ""property"": { ""type"": ""string"", ""description"": ""action=set-property / get-property：单个属性名或属性路径（如 a.b[0].c）。"" },
@@ -150,7 +150,7 @@ namespace CustomUnityCli.Editor
         {
             CucliArgs args = context.Input;
             string name = args.GetString("name");
-            string primitiveName = args.GetString("primitiveType") ?? args.GetString("primitive_type");
+            string primitiveName = args.GetFirstString("primitiveType", "primitive_type", "primitive");
             string prefabPath = args.GetString("prefabPath") ?? args.GetString("prefab_path");
             bool saveAsPrefab = args.GetBool("saveAsPrefab", args.GetBool("save_as_prefab", false));
             bool instantiateFromPrefab = !string.IsNullOrWhiteSpace(prefabPath) && !saveAsPrefab;
@@ -365,7 +365,14 @@ namespace CustomUnityCli.Editor
             Undo.RecordObject(gameObject, "cucli modify " + gameObject.name);
             Undo.RecordObject(gameObject.transform, "cucli modify " + gameObject.name);
 
-            string newName = args.GetString("newName") ?? args.GetString("new_name");
+            string newName = args.GetFirstString("newName", "new_name");
+            if (string.IsNullOrWhiteSpace(newName)
+                && !string.IsNullOrWhiteSpace(args.GetString("target"))
+                && !string.IsNullOrWhiteSpace(args.GetString("name")))
+            {
+                newName = args.GetString("name");
+            }
+
             if (!string.IsNullOrWhiteSpace(newName))
             {
                 gameObject.name = newName.Trim();
@@ -577,7 +584,14 @@ namespace CustomUnityCli.Editor
             Undo.RegisterCreatedObjectUndo(clone, "cucli duplicate");
             Undo.RecordObject(clone.transform, "cucli duplicate transform");
 
-            string newName = args.GetString("newName") ?? args.GetString("new_name");
+            string newName = args.GetFirstString("newName", "new_name");
+            if (string.IsNullOrWhiteSpace(newName)
+                && !string.IsNullOrWhiteSpace(args.GetString("target"))
+                && !string.IsNullOrWhiteSpace(args.GetString("name")))
+            {
+                newName = args.GetString("name");
+            }
+
             if (!string.IsNullOrWhiteSpace(newName)) clone.name = newName.Trim();
 
             if (args.Token("offset") != null)
@@ -636,29 +650,34 @@ namespace CustomUnityCli.Editor
             }
 
             JToken referenceToken = args.Token("referenceObject") ?? args.Token("reference_object");
-            if (referenceToken == null || referenceToken.Type == JTokenType.Null
-                || IsEmptyValue(referenceToken))
+            GameObject reference = target;
+            if (referenceToken != null && referenceToken.Type != JTokenType.Null
+                && !IsEmptyValue(referenceToken))
             {
-                return CucliCommandResult.Missing(
-                    "referenceObject", "示例：--reference-object Anchor --direction up --distance 2");
+                string referenceError;
+                reference = ResolveObjectToken(referenceToken, out referenceError);
+                if (referenceError != null)
+                {
+                    return CucliCommandResult.Fail(CucliErrors.TargetNotFound, referenceError);
+                }
             }
 
-            string referenceError;
-            GameObject reference = ResolveObjectToken(referenceToken, out referenceError);
-            if (referenceError != null)
-            {
-                return CucliCommandResult.Fail(CucliErrors.TargetNotFound, referenceError);
-            }
-
+            JToken offsetToken = args.Token("offset") ?? args.Token("position");
+            bool hasOffset = offsetToken != null && offsetToken.Type != JTokenType.Null;
             string direction = (args.GetString("direction") ?? "forward").Trim().ToLowerInvariant();
-            float distance = args.GetFloat("distance", 1f);
+            float distance = args.Has("distance") ? args.GetFloat("distance", 1f) : (hasOffset ? 0f : 1f);
             bool worldSpace = args.GetBool("worldSpace", args.GetBool("world_space", true));
 
             Vector3 localAxis = DirectionToAxis(direction);
             Vector3 axis = worldSpace ? localAxis : reference.transform.TransformDirection(localAxis);
             Vector3 newPosition = reference.transform.position + axis * distance;
 
-            if (args.Token("offset") != null) newPosition += args.GetVector3("offset");
+            if (hasOffset)
+            {
+                Vector3 extra = args.GetVector3("offset");
+                if (extra == Vector3.zero) extra = args.GetVector3("position");
+                newPosition += extra;
+            }
 
             Undo.RecordObject(target.transform, "cucli move_relative");
             target.transform.position = newPosition;
@@ -764,12 +783,11 @@ namespace CustomUnityCli.Editor
                     "'" + method + "' 不受支持。可用：" + string.Join(", ", SupportedSearchMethods) + "。");
             }
 
-            string searchTerm = args.GetString("searchTerm") ?? args.GetString("search_term")
-                ?? args.GetString("target");
+            string searchTerm = args.GetFirstString("searchTerm", "search_term", "target", "name");
             if (string.IsNullOrWhiteSpace(searchTerm))
             {
                 return CucliCommandResult.Missing(
-                    "searchTerm", "searchTerm 与 target 至少提供一个。示例：--search-term Ball --search-method by_name");
+                    "searchTerm", "searchTerm、target 或 name 至少提供一个。示例：--search-term Ball --search-method by_name");
             }
 
             searchTerm = searchTerm.Trim();
@@ -931,8 +949,7 @@ namespace CustomUnityCli.Editor
                     CucliErrors.TargetNotFound, resolveError ?? "需要 target 来指定 GameObject。");
             }
 
-            string typeName = args.GetString("componentType") ?? args.GetString("component_type")
-                ?? args.GetString("type");
+            string typeName = args.GetFirstString("componentType", "component_type", "component", "type");
             if (string.IsNullOrWhiteSpace(typeName))
             {
                 return CucliCommandResult.Missing(
@@ -1026,8 +1043,7 @@ namespace CustomUnityCli.Editor
                     CucliErrors.TargetNotFound, resolveError ?? "需要 target 来指定 GameObject。");
             }
 
-            string typeName = args.GetString("componentType") ?? args.GetString("component_type")
-                ?? args.GetString("type");
+            string typeName = args.GetFirstString("componentType", "component_type", "component", "type");
             if (string.IsNullOrWhiteSpace(typeName))
             {
                 return CucliCommandResult.Missing("componentType");
@@ -1109,8 +1125,7 @@ namespace CustomUnityCli.Editor
                     CucliErrors.TargetNotFound, resolveError ?? "需要 target 来指定 GameObject。");
             }
 
-            string typeName = args.GetString("componentType") ?? args.GetString("component_type")
-                ?? args.GetString("type");
+            string typeName = args.GetFirstString("componentType", "component_type", "component", "type");
             if (string.IsNullOrWhiteSpace(typeName))
             {
                 return CucliCommandResult.Missing("componentType");
@@ -1191,8 +1206,7 @@ namespace CustomUnityCli.Editor
                     CucliErrors.TargetNotFound, resolveError ?? "需要 target 来指定 GameObject。");
             }
 
-            string typeName = args.GetString("componentType") ?? args.GetString("component_type")
-                ?? args.GetString("type");
+            string typeName = args.GetFirstString("componentType", "component_type", "component", "type");
             if (string.IsNullOrWhiteSpace(typeName))
             {
                 return CucliCommandResult.Missing("componentType");
@@ -1269,8 +1283,7 @@ namespace CustomUnityCli.Editor
                     CucliErrors.TargetNotFound, resolveError ?? "需要 target 来指定 GameObject。");
             }
 
-            string typeName = args.GetString("componentType") ?? args.GetString("component_type")
-                ?? args.GetString("type");
+            string typeName = args.GetFirstString("componentType", "component_type", "component", "type");
 
             Object target;
             string typeLabel;

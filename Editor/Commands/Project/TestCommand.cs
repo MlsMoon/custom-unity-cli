@@ -1164,8 +1164,11 @@ namespace CustomUnityCli.Editor
     /// Runtime implementation of the test framework's <c>ICallbacks</c>. The interface type only
     /// exists when <c>com.unity.test-framework</c> is installed, so it is implemented by a
     /// <see cref="DispatchProxy"/> instead of a compile-time class.
+    /// <c>DispatchProxy.Create</c> requires a public, non-sealed proxy type with a public
+    /// parameterless constructor; keep this type public even though the rest of the command is
+    /// internal.
     /// </summary>
-    internal sealed class CucliTestCallbackProxy : DispatchProxy
+    public class CucliTestCallbackProxy : DispatchProxy
     {
         protected override object Invoke(MethodInfo targetMethod, object[] args)
         {

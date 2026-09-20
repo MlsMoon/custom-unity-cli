@@ -234,7 +234,7 @@ function Has-Group {
 $Script:ContractAnswers = @(
     'MISSING_PARAMETER', 'INVALID_PARAMETER', 'USAGE_ERROR', 'CONFIRMATION_REQUIRED', 'ASSET_EXISTS',
     'TARGET_NOT_FOUND', 'TARGET_AMBIGUOUS', 'ASSET_NOT_FOUND', 'MEMBER_NOT_FOUND', 'TYPE_NOT_FOUND',
-    'WRONG_MODE', 'OPTIONAL_PACKAGE_MISSING', 'COMPILATION_IN_PROGRESS', 'WORKER_BUSY', 'TIMEOUT',
+    'WRONG_MODE', 'OPTIONAL_PACKAGE_MISSING', 'COMPILATION_IN_PROGRESS', 'WORKER_BUSY',
     'UNSUPPORTED_ACTION'
 )
 
@@ -436,6 +436,12 @@ function Invoke-TierA {
                 Add-Result -Tier 'A' -Key $key -Status 'PASS' -DurationMs $r.DurationMs -Detail 'ran with no arguments'
             } elseif ($Script:FatalAnswers -contains $code) {
                 Add-Result -Tier 'A' -Key $key -Status 'FAIL' -ErrorCode $code -DurationMs $r.DurationMs -Detail $r.Message
+                if ($code -eq 'WORKER_UNAVAILABLE' -or $code -eq 'JOB_INVALID') {
+                    Write-Host "[selftest] worker lost ($code); stopping the remaining contract probes." -ForegroundColor Red
+                    return
+                }
+            } elseif ($code -eq 'TIMEOUT') {
+                Add-Result -Tier 'A' -Key $key -Status 'FAIL' -ErrorCode $code -DurationMs $r.DurationMs -Detail $r.Message
             } elseif ($Script:ContractAnswers -contains $code) {
                 Add-Result -Tier 'A' -Key $key -Status 'PASS' -ErrorCode $code -DurationMs $r.DurationMs -Detail 'validated input as expected'
             } else {
@@ -461,13 +467,21 @@ function Assert-Cucli {
     if ($Script:OptionAction.Count -gt 0 -and ($Script:OptionAction -notcontains $Key)) { return $null }
 
     $parts = $Key -split '/'
-    if (-not (Test-ActionExists $parts[0] $parts[1])) {
-        Add-Result -Tier 'B' -Key $Key -Status 'SKIP' -Detail "this build has no '$($parts[1])' action on '$($parts[0])'"
+    $groupName = $CliArgs[0]
+    $actionName = if ($CliArgs.Count -gt 1) { $CliArgs[1] } else { $parts[1] }
+    if (-not (Test-ActionExists $groupName $actionName)) {
+        Add-Result -Tier 'B' -Key $Key -Status 'SKIP' -Detail "this build has no '$actionName' action on '$groupName'"
         return $null
     }
 
     if (-not $Expect) { $Expect = $expectData }
     $r = Invoke-Cucli -CliArgs $CliArgs -TimeoutSec $TimeoutSec
+    if (-not $r.Ok -and $r.ErrorCode -eq 'WORKER_UNAVAILABLE') {
+        Write-Host "[selftest] worker unavailable on $Key; waiting and retrying once." -ForegroundColor Yellow
+        if (Wait-ForWorker) {
+            $r = Invoke-Cucli -CliArgs $CliArgs -TimeoutSec $TimeoutSec
+        }
+    }
     if (-not $r.Ok) {
         Add-Result -Tier 'B' -Key $Key -Status 'FAIL' -ErrorCode $r.ErrorCode -DurationMs $r.DurationMs `
             -Detail "exit=$($r.ExitCode) $($r.Message)"
@@ -576,7 +590,7 @@ function Invoke-TierB {
     }
     if (Has-Group 'build') {
         Assert-Cucli 'build/status'   @('build', 'status')   | Out-Null
-        Assert-Cucli 'build/settings' @('build', 'settings') | Out-Null
+        Assert-Cucli 'build/settings' @('build', 'settings', '--property', 'product_name') | Out-Null
         Assert-Cucli 'build/scenes'   @('build', 'scenes', '--page-size', '5') | Out-Null
         Assert-Cucli 'build/profiles' @('build', 'profiles') | Out-Null
     }
@@ -593,10 +607,6 @@ function Invoke-TierB {
         Assert-Cucli 'camera/ping'         @('camera', 'ping')         | Out-Null
     }
     if (Has-Group 'test') { Assert-Cucli 'test/status' @('test', 'status') | Out-Null }
-    if (Has-Group 'animation') {
-        Assert-Cucli 'animation/clip_get_info'        @('animation', 'clip_get_info', '--action', 'clip_get_info')        | Out-Null
-        Assert-Cucli 'animation/controller_get_info'  @('animation', 'controller_get_info', '--action', 'controller_get_info') | Out-Null
-    }
     if (Has-Group 'ui') {
         Assert-Cucli 'ui/ping' @('ui', 'ping') | Out-Null
         Assert-Cucli 'ui/list' @('ui', 'list') | Out-Null
@@ -629,13 +639,25 @@ function Invoke-TierB {
         Assert-Cucli 'texture/apply_gradient'     @('texture', 'apply_gradient', '--path', "$($Script:Sandbox)/SelfTest.png", '--force') | Out-Null
         Assert-Cucli 'texture/set_import_settings' @('texture', 'set_import_settings', '--path', "$($Script:Sandbox)/SelfTest.png", '--filter-mode', 'Point') | Out-Null
     }
+    if (Has-Group 'animation') {
+        Assert-Cucli 'animation/clip_create' @('animation', 'clip_create', '--clip-path', "$($Script:Sandbox)/SelfTest.anim", '--force') | Out-Null
+        Assert-Cucli 'animation/clip_get_info' @('animation', 'clip_get_info', '--clip-path', "$($Script:Sandbox)/SelfTest.anim") | Out-Null
+        Assert-Cucli 'animation/controller_create' @('animation', 'controller_create', '--controller-path', "$($Script:Sandbox)/SelfTest.controller", '--force') | Out-Null
+        Assert-Cucli 'animation/controller_get_info' @('animation', 'controller_get_info', '--controller-path', "$($Script:Sandbox)/SelfTest.controller") | Out-Null
+    }
     if (Has-Group 'script') {
-        $body = 'namespace CucliSelfTest { internal static class Generated { public const int Value = 42; } }'
-        Assert-Cucli 'script/create'            @('script', 'create', '--path', "$($Script:Sandbox)/SelfTest.cs", '--content', $body, '--force') | Out-Null
+        $body = "using System;`nnamespace CucliSelfTest { internal static class Generated { public const int Value = 42; } }"
+            Assert-Cucli 'script/create'            @('script', 'create', '--path', "$($Script:Sandbox)/SelfTest.cs", '--contents', $body, '--force') | Out-Null
         Assert-Cucli 'script/read'              @('script', 'read', '--path', "$($Script:Sandbox)/SelfTest.cs", '--max-chars', '4000') | Out-Null
         Assert-Cucli 'script/get_sha'           @('script', 'get_sha', '--path', "$($Script:Sandbox)/SelfTest.cs") | Out-Null
         Assert-Cucli 'script/validate'          @('script', 'validate', '--path', "$($Script:Sandbox)/SelfTest.cs") | Out-Null
-        Assert-Cucli 'script/apply_text_edits'  @('script', 'apply_text_edits', '--path', "$($Script:Sandbox)/SelfTest.cs", '--edits', '[{"line":1,"column":1,"text":"// touched by cucli-selftest`n"}]') | Out-Null
+        $sha = Invoke-Cucli -CliArgs @('script', 'get_sha', '--path', "$($Script:Sandbox)/SelfTest.cs")
+        $shaValue = if ($sha.Ok -and $sha.Data.sha256) { [string]$sha.Data.sha256 } elseif ($sha.Ok -and $sha.Data.sha) { [string]$sha.Data.sha } else { '' }
+        if ($shaValue) {
+            Assert-Cucli 'script/apply_text_edits' @('script', 'apply_text_edits', '--path', "$($Script:Sandbox)/SelfTest.cs", '--precondition-sha256', $shaValue, '--edits', '[{"startLine":2,"startCol":1,"endLine":2,"endCol":1,"newText":"// touched by cucli-selftest\n"}]') | Out-Null
+        } else {
+            Add-Result -Tier 'B' -Key 'script/apply_text_edits' -Status 'FAIL' -Detail 'could not read script SHA before apply_text_edits'
+        }
     }
 
     # --- GameObject round trip ------------------------------------------
@@ -668,19 +690,29 @@ function Invoke-TierB {
         Assert-Cucli 'asset/duplicate' @('asset', 'duplicate', '--path', "$($Script:Sandbox)/SelfTest.mat", '--target-path', "$($Script:Sandbox)/Copy.mat") | Out-Null
         Assert-Cucli 'asset/rename'    @('asset', 'rename', '--path', "$($Script:Sandbox)/Copy.mat", '--name', 'Renamed.mat') | Out-Null
         Assert-Cucli 'asset/import'    @('asset', 'import', '--path', "$($Script:Sandbox)/SelfTest.png") | Out-Null
-        Assert-Cucli 'asset/modify'    @('asset', 'modify', '--path', "$($Script:Sandbox)/SelfTest.mat") | Out-Null
+        Assert-Cucli 'asset/modify'    @('asset', 'modify', '--path', "$($Script:Sandbox)/SelfTest.mat", '--properties', '{"name":"SelfTest"}') | Out-Null
     }
 
     # --- ScriptableObject dry run against a real project asset -----------
     if (Has-Group 'so') {
-        $found = Invoke-Cucli -CliArgs @('asset', 'search', '--type', 'ScriptableObject', '--page-size', '1')
+        $found = Invoke-Cucli -CliArgs @('asset', 'search', '--filter-type', 'ScriptableObject', '--page-size', '20')
         $soPath = $null
-        if ($found.Ok -and $found.Data.items -and @($found.Data.items).Count -gt 0) {
-            $first = @($found.Data.items)[0]
-            $soPath = if ($first -is [string]) { $first } else { $first.path }
+        if ($found.Ok) {
+            $candidates = @()
+            if ($found.Data.items) { $candidates += @($found.Data.items) }
+            elseif ($found.Data.assets) { $candidates += @($found.Data.assets) }
+            foreach ($entry in $candidates) {
+                if ($null -eq $entry) { continue }
+                $entryPath = if ($entry -is [string]) { $entry } else { $entry.path }
+                $entryType = if ($entry -is [string]) { '' } else { [string]$entry.assetType }
+                if ([string]::IsNullOrWhiteSpace($entryPath)) { continue }
+                if ($entryType -eq 'Folder') { continue }
+                $soPath = [string]$entryPath
+                break
+            }
         }
         if ($soPath) {
-            Assert-Cucli 'so/modify-dry-run' @('so', 'modify', '--target-path', $soPath, '--dry-run') | Out-Null
+            Assert-Cucli 'so/modify-dry-run' @('so', 'modify', '--target-path', $soPath, '--dry-run', '--patches', '[]') | Out-Null
         } else {
             Add-Result -Tier 'B' -Key 'so/modify-dry-run' -Status 'SKIP' -Detail 'no ScriptableObject asset found to probe'
         }

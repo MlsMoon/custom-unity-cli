@@ -6,6 +6,7 @@ using System.Text;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
 namespace CustomUnityCli.Editor
@@ -58,7 +59,7 @@ namespace CustomUnityCli.Editor
       ""default"": ""import""
     },
     ""path"": { ""type"": ""string"", ""description"": ""Target asset path. For search: optional folder scope."", ""aliases"": [""assetPath"", ""asset_path""] },
-    ""destination"": { ""type"": ""string"", ""description"": ""action=duplicate/move/rename: target path."", ""aliases"": [""destinationPath"", ""destination_path""] },
+    ""destination"": { ""type"": ""string"", ""description"": ""action=duplicate/move/rename: target path."", ""aliases"": [""destinationPath"", ""destination_path"", ""targetPath"", ""target_path"", ""newName"", ""new_name"", ""name""] },
     ""assetType"": { ""type"": ""string"", ""aliases"": [""asset_type""], ""description"": ""action=create: folder, material, physicsmaterial, scriptableobject/so, textasset, animationclip, texture2d, rendertexture, scene, json."" },
     ""properties"": { ""type"": ""object"", ""description"": ""action=create/modify: member name to value."" },
     ""contents"": { ""type"": ""string"", ""description"": ""action=create: text payload for textasset/json."" },
@@ -66,7 +67,7 @@ namespace CustomUnityCli.Editor
     ""force"": { ""type"": ""boolean"", ""default"": false, ""description"": ""action=delete/import: confirm the destructive or forced operation."" },
     ""generatePreview"": { ""type"": ""boolean"", ""default"": false, ""aliases"": [""generate_preview""] },
     ""searchPattern"": { ""type"": ""string"", ""aliases"": [""search_pattern""], ""description"": ""action=search: raw AssetDatabase filter fragment."" },
-    ""filterType"": { ""type"": ""string"", ""aliases"": [""filter_type""], ""description"": ""action=search: type filter, e.g. Material or t:Material."" },
+    ""filterType"": { ""type"": ""string"", ""aliases"": [""filter_type"", ""type""], ""description"": ""action=search: type filter, e.g. Material or t:Material. Also accepts --type."" },
     ""filterName"": { ""type"": ""string"", ""aliases"": [""filter_name"", ""nameFilter"", ""name_filter""], ""description"": ""action=search: file name substring."" },
     ""filterDateAfter"": { ""type"": ""string"", ""aliases"": [""filter_date_after""], ""description"": ""action=search: ISO 8601 lower bound on LastWriteTimeUtc."" },
     ""filterDateBefore"": { ""type"": ""string"", ""aliases"": [""filter_date_before""], ""description"": ""action=search: ISO 8601 upper bound on LastWriteTimeUtc."" },
@@ -159,6 +160,29 @@ namespace CustomUnityCli.Editor
             string path = NormalizeOrNull(args, "path");
             if (path != null) return path;
             return NormalizeOrNull(args, "assetPath");
+        }
+
+        private static string LoadedSceneConflict(string path, bool isFolder)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            string normalized = path.Replace('\\', '/').TrimEnd('/');
+            for (int index = 0; index < SceneManager.sceneCount; index++)
+            {
+                Scene scene = SceneManager.GetSceneAt(index);
+                if (!scene.IsValid() || string.IsNullOrWhiteSpace(scene.path)) continue;
+                string scenePath = scene.path.Replace('\\', '/');
+                if (string.Equals(scenePath, normalized, StringComparison.OrdinalIgnoreCase))
+                {
+                    return "拒绝删除当前已加载的场景文件 " + scenePath + "。";
+                }
+
+                if (isFolder && scenePath.StartsWith(normalized + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "拒绝删除目录 " + normalized + "：其中包含已加载场景 " + scenePath + "。";
+                }
+            }
+
+            return null;
         }
 
         private static string SnakeCase(string name)
@@ -1051,6 +1075,15 @@ namespace CustomUnityCli.Editor
                 return CucliCommandResult.Fail(CucliErrors.AssetNotFound, "找不到要删除的资产：" + path + "。");
             }
 
+            string loadedSceneBlock = LoadedSceneConflict(path, isFolder);
+            if (loadedSceneBlock != null)
+            {
+                return CucliCommandResult.Fail(
+                    CucliErrors.InvalidParameter,
+                    loadedSceneBlock + " 请先切走该场景再删除。",
+                    new { path, isFolder });
+            }
+
             if (!args.GetBool("force", false))
             {
                 return CucliCommandResult.Fail(
@@ -1093,8 +1126,8 @@ namespace CustomUnityCli.Editor
                 return CucliCommandResult.Fail(CucliErrors.AssetNotFound, "找不到源资产：" + path + "。");
             }
 
-            string rawDestination = args.GetString("destination") ?? args.GetString("destinationPath")
-                ?? args.GetString("destination_path");
+            string rawDestination = args.GetFirstString(
+                "destination", "destinationPath", "destination_path", "targetPath", "target_path");
             string destination = string.IsNullOrWhiteSpace(rawDestination)
                 ? CucliAssets.GenerateUniquePath(path)
                 : CucliAssets.NormalizeAssetPath(rawDestination);
@@ -1138,9 +1171,8 @@ namespace CustomUnityCli.Editor
             string path = ReadPath(args);
             if (path == null) return CucliCommandResult.Missing("path");
 
-            string rawDestination = args.GetString("destination") ?? args.GetString("destinationPath")
-                ?? args.GetString("destination_path") ?? args.GetString("newName")
-                ?? args.GetString("new_name");
+            string rawDestination = args.GetFirstString(
+                "destination", "destinationPath", "destination_path", "newName", "new_name", "name");
             if (string.IsNullOrWhiteSpace(rawDestination))
             {
                 return CucliCommandResult.Missing(
@@ -1237,7 +1269,7 @@ namespace CustomUnityCli.Editor
 
             string filterName = args.GetString("filterName") ?? args.GetString("filter_name")
                 ?? args.GetString("nameFilter") ?? args.GetString("name_filter");
-            string filterType = args.GetString("filterType") ?? args.GetString("filter_type");
+            string filterType = args.GetFirstString("filterType", "filter_type", "type");
             string searchPattern = args.GetString("searchPattern") ?? args.GetString("search_pattern");
 
             var filters = new List<string>();

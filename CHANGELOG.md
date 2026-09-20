@@ -151,5 +151,21 @@ All four found by running `cucli selftest` against the CLI itself.
   failure per action while a domain reload was in flight. One measured run reported 68 such failures
   against 3 passes, which buries whatever real defect is underneath. Both tiers now wait, bounded and
   with progress output, for the worker to answer, and report a single clear failure if it never does.
+- **`TIMEOUT` was treated as a contract PASS.** A hung worker then looked green in Tier A and the
+  suite continued into `JOB_INVALID` / `WORKER_UNAVAILABLE` cascades. Timeouts are failures, and
+  Tier B retries a command once after waiting for the worker to recover.
+- **`cucli selftest echo` launched the black-box harness.** Bare `selftest` still forwards to
+  `cucli-selftest.ps1`; Editor actions `echo` / `core` / `surface` / `sample` now go through the
+  job queue. A leftover `Invoke-HostSelftest` call that did not exist is gone.
+- **Common CLI aliases were missing.** `--path` for materials, `--name` / `--primitive` /
+  `--component` for objects, `--filter-mode` for textures, `--property` / `--key` for build
+  settings, `--target-path` / `--name` for asset duplicate/rename, `--content` for scripts, and
+  `--type` for asset search. `object duplicate --target X --name Y` no longer resolves `Y` as the
+  source object. JSON string payloads such as `--edits` / `--properties` parse, and a
+  PowerShell-unwrapped single object is accepted as a one-element array.
+- **`scene load` and `scene close` now honour `--force`** to discard unsaved changes, matching the
+  documented confirmation contract. Deleting a folder that contains a loaded scene is refused.
+- **`test run` crashed creating the UTF callbacks proxy** because `DispatchProxy` requires a public,
+  non-sealed `TProxy`. `CucliTestCallbackProxy` now meets that contract.
 
 [0.1.0]: https://github.com/igp/custom-unity-cli/releases/tag/v0.1.0

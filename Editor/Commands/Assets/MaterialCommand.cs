@@ -49,7 +49,7 @@ namespace CustomUnityCli.Editor
                  ""assign_material_to_renderer"", ""set_renderer_color"", ""get_material_info""],
       ""default"": ""ping""
     },
-    ""materialPath"": { ""type"": ""string"", ""aliases"": [""material_path""], ""description"": ""Assets 相对材质路径，自动补 Assets/ 前缀与 .mat 后缀。"" },
+    ""materialPath"": { ""type"": ""string"", ""aliases"": [""material_path"", ""path""], ""description"": ""Assets 相对材质路径，自动补 Assets/ 前缀与 .mat 后缀。也接受 --path。"" },
     ""property"": { ""type"": ""string"", ""description"": ""着色器属性名。"" },
     ""value"": { ""description"": ""属性值：number / bool / array / object / string。"" },
     ""color"": { ""description"": ""颜色：[r,g,b(,a)] / 对象 {r,g,b,a} / #RRGGBB(AA)。"" },
@@ -108,10 +108,10 @@ namespace CustomUnityCli.Editor
             material = null;
             failure = null;
 
-            string raw = args.GetString("materialPath") ?? args.GetString("material_path");
+            string raw = args.GetFirstString("materialPath", "material_path", "path");
             if (string.IsNullOrWhiteSpace(raw))
             {
-                failure = CucliCommandResult.Missing("materialPath", "例如 --material-path Assets/Materials/Hero.mat。");
+                failure = CucliCommandResult.Missing("materialPath", "例如 --material-path Assets/Materials/Hero.mat 或 --path Assets/Materials/Hero.mat。");
                 return false;
             }
 
@@ -253,10 +253,10 @@ namespace CustomUnityCli.Editor
         {
             CucliArgs args = context.Input;
 
-            string raw = args.GetString("materialPath") ?? args.GetString("material_path");
+            string raw = args.GetFirstString("materialPath", "material_path", "path");
             if (string.IsNullOrWhiteSpace(raw))
             {
-                return CucliCommandResult.Missing("materialPath", "例如 --material-path Assets/Materials/Hero.mat。");
+                return CucliCommandResult.Missing("materialPath", "例如 --material-path Assets/Materials/Hero.mat 或 --path Assets/Materials/Hero.mat。");
             }
 
             string materialPath = NormalizeMaterialPath(raw);

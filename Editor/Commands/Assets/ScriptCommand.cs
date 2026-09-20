@@ -69,7 +69,7 @@ namespace CustomUnityCli.Editor
     },
     ""name"": { ""type"": ""string"", ""description"": ""类名或文件名，拼成 {name}.cs；须匹配 ^[a-zA-Z_][a-zA-Z0-9_]*$。"" },
     ""path"": { ""type"": ""string"", ""description"": ""相对 Assets/ 的目录；空时默认 Scripts。"" },
-    ""contents"": { ""type"": ""string"", ""description"": ""action=create/update: 脚本正文。"" },
+    ""contents"": { ""type"": ""string"", ""aliases"": [""content""], ""description"": ""action=create/update: 脚本正文。也接受 --content."" },
     ""contentsEncoded"": { ""type"": ""boolean"", ""default"": false, ""aliases"": [""contents_encoded""] },
     ""encodedContents"": { ""type"": ""string"", ""aliases"": [""encoded_contents""], ""description"": ""contentsEncoded=true 时的 base64 正文。"" },
     ""scriptType"": { ""type"": ""string"", ""aliases"": [""script_type""], ""description"": ""action=create: MonoBehaviour / ScriptableObject / Editor / EditorWindow / Plain。"" },
@@ -275,7 +275,7 @@ namespace CustomUnityCli.Editor
                 }
             }
 
-            return args.GetString("contents");
+            return args.GetFirstString("contents", "content");
         }
 
         /// <summary>Refreshes the asset database after a write; scripts are recompiled by Unity itself.</summary>
@@ -321,10 +321,13 @@ namespace CustomUnityCli.Editor
 
             if (File.Exists(scriptPath))
             {
-                return CucliCommandResult.Fail(
-                    CucliErrors.AssetExists,
-                    "脚本已存在：" + assetPath + "。请改用 'cucli script apply_text_edits' 精确修改。",
-                    new { path = assetPath });
+                if (!args.GetBool("force", false))
+                {
+                    return CucliCommandResult.Fail(
+                        CucliErrors.AssetExists,
+                        "脚本已存在：" + assetPath + "。请改用 'cucli script apply_text_edits' 精确修改，或加 --force 覆盖。",
+                        new { path = assetPath });
+                }
             }
 
             string directory = CucliAssets.ParentFolder(assetPath);
@@ -596,11 +599,14 @@ namespace CustomUnityCli.Editor
                 }
 
                 var editArgs = new CucliArgs(edit);
-                int startLine = editArgs.GetInt("startLine", editArgs.GetInt("start_line", 0));
-                int startCol = editArgs.GetInt("startCol", editArgs.GetInt("start_column", 0));
+                int startLine = editArgs.GetInt("startLine", editArgs.GetInt("start_line", editArgs.GetInt("line", 0)));
+                int startCol = editArgs.GetInt("startCol", editArgs.GetInt("start_column", editArgs.GetInt("column", 0)));
                 int endLine = editArgs.GetInt("endLine", editArgs.GetInt("end_line", 0));
                 int endCol = editArgs.GetInt("endCol", editArgs.GetInt("end_column", 0));
-                string newText = editArgs.GetString("newText") ?? editArgs.GetString("new_text") ?? string.Empty;
+                string newText = editArgs.GetFirstString("newText", "new_text", "text") ?? string.Empty;
+
+                if (endLine < 1) endLine = startLine;
+                if (endCol < 1) endCol = startCol;
 
                 if (startLine < 1 || startCol < 1 || endLine < 1 || endCol < 1)
                 {

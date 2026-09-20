@@ -152,12 +152,46 @@ function Read-JsonFile {
     }
 }
 
+function ConvertTo-JsonNative {
+    param($Value)
+    if ($null -eq $Value) { return $null }
+    if ($Value -is [string] -or $Value -is [bool] -or $Value -is [byte] -or
+        $Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [decimal]) {
+        return $Value
+    }
+    if ($Value -is [datetime]) { return ([datetime]$Value).ToUniversalTime().ToString('o') }
+    if ($Value -is [guid]) { return $Value.ToString('N') }
+    if ($Value -is [System.Collections.IDictionary]) {
+        $object = [ordered]@{}
+        foreach ($key in $Value.Keys) { $object[[string]$key] = ConvertTo-JsonNative $Value[$key] }
+        return $object
+    }
+    if ($Value -is [System.Collections.IEnumerable] -and -not ($Value -is [string])) {
+        $items = New-Object System.Collections.ArrayList
+        foreach ($item in $Value) { [void]$items.Add((ConvertTo-JsonNative $item)) }
+        return @($items.ToArray())
+    }
+
+    $ps = $Value.PSObject
+    if ($null -ne $ps -and $ps.Properties) {
+        $object = [ordered]@{}
+        foreach ($property in $ps.Properties) {
+            if ($property.MemberType -ne 'NoteProperty') { continue }
+            $object[$property.Name] = ConvertTo-JsonNative $property.Value
+        }
+        if ($object.Count -gt 0) { return $object }
+    }
+
+    return [string]$Value
+}
+
 function ConvertTo-JsonSafe {
     param($Value, [int]$Depth = 32, [switch]$Compress)
     if ($null -eq $Value) { return 'null' }
+    $normalized = ConvertTo-JsonNative $Value
     # -Compress exists for --format ndjson, where the contract is one JSON object per LINE. Emitting
     # pretty-printed multi-line JSON there breaks any line-oriented consumer (jq -c, streaming readers).
-    return ($Value | ConvertTo-Json -Depth $Depth -Compress:$Compress.IsPresent)
+    return ($normalized | ConvertTo-Json -Depth $Depth -Compress:$Compress.IsPresent)
 }
 
 #endregion
@@ -929,14 +963,23 @@ function Wait-CucliJob {
     $deadline = [datetime]::UtcNow.AddSeconds($TimeoutSeconds)
     $cancelRequested = $false
 
+    $missingSince = $null
     while ($true) {
         $found = Find-JobFile -ProjectRoot $ProjectRoot -JobId $JobId
         if ($null -eq $found) {
+            if ($null -eq $missingSince) { $missingSince = [datetime]::UtcNow }
+            if (([datetime]::UtcNow - $missingSince).TotalSeconds -lt 3) {
+                Start-Sleep -Milliseconds 150
+                continue
+            }
+
             return [ordered]@{
                 outcome = 'missing'
                 message = "Job $JobId is not present in any queue; it may have been pruned."
             }
         }
+
+        $missingSince = $null
 
         if ($found.State -in @('succeeded', 'failed', 'cancelled')) {
             $result = Read-JsonFile $found.Path
@@ -2258,24 +2301,30 @@ function Invoke-JobDispatch {
 function Invoke-CucliMain {
     param([string[]]$Raw)
 
-    # `cucli selftest ...` is forwarded verbatim, before any of our own option parsing.
-    #
-    # The self-test engine has its own parameters (-Tier, -Group, -Action, -KeepScratch, ...) and
-    # forwarding the raw tokens lets PowerShell bind them normally. Re-serialising our camelCased
-    # payload back into flags would lose the original spelling and silently change the engine's
-    # behaviour, which for a verification tool is the one thing that must not happen.
+    # `cucli selftest` with no Editor action is the black-box harness. Editor actions
+    # (echo / core / surface / sample) must still reach the worker; forwarding every `selftest`
+    # token to the harness made `cucli selftest echo` run the full suite instead.
     if ($Raw.Count -gt 0 -and $Raw[0].ToLowerInvariant() -eq 'selftest') {
-        $engine = Join-Path $Script:ScriptRoot 'cucli-selftest.ps1'
-        if (-not (Test-Path -LiteralPath $engine)) {
-            [Console]::Error.WriteLine(
-                '[cucli] the self-test engine (Tools/cucli-selftest.ps1) is missing from this installation.')
-            exit $Script:ExitProject
+        $next = if ($Raw.Count -gt 1) { $Raw[1] } else { $null }
+        $editorActions = @('echo', 'core', 'surface', 'sample')
+        $forwardToHarness = $true
+        if (-not [string]::IsNullOrWhiteSpace($next) -and ($editorActions -contains $next.ToLowerInvariant())) {
+            $forwardToHarness = $false
         }
 
-        $forwarded = @()
-        if ($Raw.Count -gt 1) { $forwarded = $Raw[1..($Raw.Count - 1)] }
-        & $engine @forwarded
-        exit $LASTEXITCODE
+        if ($forwardToHarness) {
+            $engine = Join-Path $Script:ScriptRoot 'cucli-selftest.ps1'
+            if (-not (Test-Path -LiteralPath $engine)) {
+                [Console]::Error.WriteLine(
+                    '[cucli] the self-test engine (Tools/cucli-selftest.ps1) is missing from this installation.')
+                exit $Script:ExitProject
+            }
+
+            $forwarded = @()
+            if ($Raw.Count -gt 1) { $forwarded = $Raw[1..($Raw.Count - 1)] }
+            & $engine @forwarded
+            exit $LASTEXITCODE
+        }
     }
 
     $arguments = Split-CucliArguments $Raw
@@ -2345,7 +2394,6 @@ function Invoke-CucliMain {
         'job'      { return Invoke-HostJob -ProjectRoot $projectRoot -Arguments $arguments -Format $format }
         'open'     { return Invoke-HostOpen -ProjectRoot $projectRoot -Arguments $arguments -Format $format }
         'extend'   { return Invoke-HostExtend -ProjectRoot $projectRoot -Arguments $arguments -Format $format }
-        'selftest' { return Invoke-HostSelftest -Raw $Raw -Format $format }
     }
 
     return Invoke-JobDispatch -ProjectRoot $projectRoot -Group $group -Action $action `

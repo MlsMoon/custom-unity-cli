@@ -75,6 +75,7 @@ namespace CustomUnityCli.Editor
     ""seed"": { ""type"": ""integer"", ""default"": 0 },
     ""strength"": { ""type"": ""number"", ""default"": 1.0, ""description"": ""噪声对比强度。"" },
     ""importSettings"": { ""type"": ""object"", ""aliases"": [""import_settings""] },
+    ""filterMode"": { ""type"": ""string"", ""aliases"": [""filter_mode""], ""description"": ""action=set_import_settings：简写，写入 importSettings.filterMode。"" },
     ""spriteSettings"": { ""description"": ""{pivot, pixelsPerUnit}；旧版 Sprite 设置入口。"" },
     ""asSprite"": { ""type"": ""boolean"", ""default"": false, ""aliases"": [""as_sprite""] },
     ""setPixels"": { ""type"": ""object"", ""aliases"": [""set_pixels""], ""description"": ""action=modify: {x,y,width,height,color|pixels}。"" },
@@ -1486,11 +1487,16 @@ namespace CustomUnityCli.Editor
             JObject importSettings = args.GetObject("importSettings") ?? args.GetObject("import_settings");
             JToken spriteSettings = args.Token("spriteSettings");
             bool asSprite = args.GetBool("asSprite", args.GetBool("as_sprite", false));
+            string filterMode = args.GetFirstString("filterMode", "filter_mode");
+            if (importSettings == null && !string.IsNullOrWhiteSpace(filterMode))
+            {
+                importSettings = new JObject { ["filterMode"] = filterMode };
+            }
 
             if (importSettings == null && spriteSettings == null && !asSprite)
             {
                 return CucliCommandResult.Missing(
-                    "importSettings", "set_import_settings 需要 importSettings、spriteSettings 或 asSprite 之一。");
+                    "importSettings", "set_import_settings 需要 importSettings、spriteSettings、asSprite 或 --filter-mode 之一。");
             }
 
             if (importSettings != null && asSprite)

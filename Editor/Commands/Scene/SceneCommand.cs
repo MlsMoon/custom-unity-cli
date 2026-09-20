@@ -79,7 +79,7 @@ namespace CustomUnityCli.Editor
     ""buildIndex"": { ""type"": ""integer"", ""description"": ""action=load：Build Settings 索引，与 path/name 二选一。"" },
     ""additive"": { ""type"": ""boolean"", ""default"": false, ""description"": ""action=load：以 Additive 方式打开。"" },
     ""template"": { ""type"": ""string"", ""enum"": [""empty"", ""default"", ""3d_basic"", ""2d_basic""], ""description"": ""action=create：场景模板。"" },
-    ""force"": { ""type"": ""boolean"", ""default"": false, ""description"": ""action=create：覆盖同名场景并丢弃未保存改动。"" },
+    ""force"": { ""type"": ""boolean"", ""default"": false, ""description"": ""action=create / load / close_scene：覆盖已有场景或丢弃未保存改动。"" },
     ""captureSource"": { ""type"": ""string"", ""enum"": [""game_view"", ""scene_view""], ""default"": ""game_view"" },
     ""fileName"": { ""type"": ""string"", ""description"": ""action=screenshot：输出文件名（自动补 .png）。"" },
     ""superSize"": { ""type"": ""integer"", ""minimum"": 1, ""maximum"": 8, ""default"": 1 },
@@ -376,12 +376,13 @@ namespace CustomUnityCli.Editor
                     new JObject { ["path"] = scenePath });
             }
 
-            if (AnyLoadedSceneDirty())
+            bool force = args.GetBool("force", false);
+            if (AnyLoadedSceneDirty() && !force)
             {
                 return CucliCommandResult.Fail(
                     CucliErrors.ConfirmationRequired,
                     "当前存在未保存的场景改动，按 MCP 语义拒绝加载。请先执行 'cucli scene save' 保存，"
-                    + "或显式关闭/丢弃这些改动后再加载。",
+                    + "或显式传 --force 丢弃这些改动后再加载。",
                     new JObject { ["dirtyScenes"] = DirtySceneNames(), ["requestedPath"] = scenePath });
             }
 
@@ -846,11 +847,12 @@ namespace CustomUnityCli.Editor
                     "当前只剩 1 个已加载场景，Unity 不允许关闭最后一个场景。");
             }
 
-            if (scene.isDirty)
+            bool force = args.GetBool("force", false);
+            if (scene.isDirty && !force)
             {
                 return CucliCommandResult.Fail(
                     CucliErrors.ConfirmationRequired,
-                    "场景 '" + scene.name + "' 有未保存改动，拒绝关闭。请先 'cucli scene save' 保存。",
+                    "场景 '" + scene.name + "' 有未保存改动，拒绝关闭。请先 'cucli scene save' 保存，或传 --force 丢弃改动。",
                     new JObject
                     {
                         ["sceneName"] = scene.name ?? string.Empty,

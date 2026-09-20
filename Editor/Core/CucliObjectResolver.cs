@@ -154,8 +154,11 @@ namespace CustomUnityCli.Editor
                 return Array.Empty<GameObject>();
             }
 
-            // 4. Otherwise a name.
-            return ByName(args, out error, single);
+            // 4. Otherwise a name. Search the already-resolved target string, not ByName(args):
+            // ByName prefers the `name` key, and duplicate/modify pass `name` as the *new* name
+            // while `target` identifies the source. Using ByName here would look for the clone's
+            // name before it exists.
+            return FindNamed(target, args.GetBool("allowMultiple", false), single, out error);
         }
 
         private static string Target(CucliArgs args)
@@ -223,8 +226,13 @@ namespace CustomUnityCli.Editor
 
         private static GameObject[] ByName(CucliArgs args, out string error, bool single)
         {
-            error = null;
             string name = args.GetString("name") ?? Target(args);
+            return FindNamed(name, args.GetBool("allowMultiple", false), single, out error);
+        }
+
+        private static GameObject[] FindNamed(string name, bool allowMultiple, bool single, out string error)
+        {
+            error = null;
             if (string.IsNullOrWhiteSpace(name))
             {
                 error = "a GameObject 'name' is required.";
@@ -241,7 +249,7 @@ namespace CustomUnityCli.Editor
                 return Array.Empty<GameObject>();
             }
 
-            if (single && matches.Length > 1 && !args.GetBool("allowMultiple", false))
+            if (single && matches.Length > 1 && !allowMultiple)
             {
                 error = matches.Length + " GameObjects are named '" + name
                     + "'. Pass a hierarchy path or an instanceId, or set allowMultiple: true.";

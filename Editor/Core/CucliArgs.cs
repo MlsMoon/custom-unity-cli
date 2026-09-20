@@ -33,7 +33,13 @@ namespace CustomUnityCli.Editor
         {
             if (m_args == null || string.IsNullOrEmpty(name)) return null;
             JToken token;
-            return m_args.TryGetValue(name, out token) ? token : null;
+            if (m_args.TryGetValue(name, out token)) return token;
+            foreach (string alternate in AlternateKeys(name))
+            {
+                if (m_args.TryGetValue(alternate, out token)) return token;
+            }
+
+            return null;
         }
 
         public string GetString(string name, string fallback = null)
@@ -46,6 +52,19 @@ namespace CustomUnityCli.Editor
                 return token.ToString(Newtonsoft.Json.Formatting.None);
             }
             return Convert.ToString(((JValue)token).Value, CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>First non-empty string among the given keys (each key also tries camel/snake).</summary>
+        public string GetFirstString(params string[] names)
+        {
+            if (names == null) return null;
+            for (int index = 0; index < names.Length; index++)
+            {
+                string value = GetString(names[index]);
+                if (!string.IsNullOrWhiteSpace(value)) return value;
+            }
+
+            return null;
         }
 
         public string RequireString(string name)
@@ -374,13 +393,43 @@ namespace CustomUnityCli.Editor
         public JObject GetObject(string name)
         {
             JToken token = Token(name);
-            return token as JObject;
+            if (token == null || token.Type == JTokenType.Null) return null;
+            if (token.Type == JTokenType.Object) return (JObject)token;
+            if (token.Type == JTokenType.String)
+            {
+                string text = token.Value<string>();
+                if (!string.IsNullOrWhiteSpace(text) && text.TrimStart().StartsWith("{", StringComparison.Ordinal))
+                {
+                    try { return JObject.Parse(text); }
+                    catch (Newtonsoft.Json.JsonException) { return null; }
+                }
+            }
+
+            return null;
         }
 
         public JArray GetArray(string name)
         {
             JToken token = Token(name);
-            return token as JArray;
+            if (token == null || token.Type == JTokenType.Null) return null;
+            if (token.Type == JTokenType.Array) return (JArray)token;
+            // PowerShell ConvertTo-Json unwraps a one-element array into a lone object. Treat that
+            // as a single-item list so `--edits '[{...}]'` still reaches apply_text_edits.
+            if (token.Type == JTokenType.Object) return new JArray(token);
+            if (token.Type == JTokenType.String)
+            {
+                string text = token.Value<string>();
+                if (string.IsNullOrWhiteSpace(text)) return null;
+                string trimmed = text.TrimStart();
+                try
+                {
+                    if (trimmed.StartsWith("[", StringComparison.Ordinal)) return JArray.Parse(text);
+                    if (trimmed.StartsWith("{", StringComparison.Ordinal)) return new JArray(JObject.Parse(text));
+                }
+                catch (Newtonsoft.Json.JsonException) { return null; }
+            }
+
+            return null;
         }
 
         public object GetRaw(string name)
@@ -422,6 +471,58 @@ namespace CustomUnityCli.Editor
             }
 
             return GetObject(name);
+        }
+
+        private static IEnumerable<string> AlternateKeys(string name)
+        {
+            if (name.IndexOf('_') >= 0)
+            {
+                yield return ToCamel(name);
+                yield break;
+            }
+
+            string snake = ToSnake(name);
+            if (!string.Equals(snake, name, StringComparison.Ordinal)) yield return snake;
+        }
+
+        private static string ToCamel(string name)
+        {
+            var builder = new System.Text.StringBuilder(name.Length);
+            bool upper = false;
+            for (int index = 0; index < name.Length; index++)
+            {
+                char current = name[index];
+                if (current == '_')
+                {
+                    upper = true;
+                    continue;
+                }
+
+                builder.Append(upper ? char.ToUpperInvariant(current) : current);
+                upper = false;
+            }
+
+            return builder.ToString();
+        }
+
+        private static string ToSnake(string name)
+        {
+            var builder = new System.Text.StringBuilder(name.Length + 4);
+            for (int index = 0; index < name.Length; index++)
+            {
+                char current = name[index];
+                if (char.IsUpper(current))
+                {
+                    if (index > 0) builder.Append('_');
+                    builder.Append(char.ToLowerInvariant(current));
+                }
+                else
+                {
+                    builder.Append(current);
+                }
+            }
+
+            return builder.ToString();
         }
     }
 

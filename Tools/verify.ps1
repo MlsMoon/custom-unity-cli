@@ -138,7 +138,9 @@ Write-Section '2. meta coverage'
 
 $packageMetaFile = Join-Path $PackageRoot '.gitignore'
 $allFiles = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -Force -File |
-    Where-Object { $_.FullName -notmatch '\\\.git\\' })
+    Where-Object {
+        $_.FullName -notmatch '\\\.git\\' -and $_.FullName -notmatch '\\\.agents\\'
+    })
 $assets = @($allFiles | Where-Object {
     $_.Extension -ne '.meta' -and $_.Name -notin @('.gitignore', '.gitattributes')
 })

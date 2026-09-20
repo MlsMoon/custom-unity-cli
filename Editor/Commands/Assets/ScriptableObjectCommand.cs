@@ -275,13 +275,12 @@ namespace CustomUnityCli.Editor
                     new { path });
             }
 
-            JArray patches = ReadPatches(args, true);
+            bool dryRun = args.GetBool("dryRun", args.GetBool("dry_run", false));
+            JArray patches = ReadPatches(args, !dryRun);
             if (patches == null)
             {
                 return CucliCommandResult.Invalid("patches", "modify 的 patches 必须是数组或 JSON 数组字符串。");
             }
-
-            bool dryRun = args.GetBool("dryRun", args.GetBool("dry_run", false));
 
             var results = new JArray();
             bool allOk = ApplyPatches(context, target, patches, dryRun, results, out string patchError);
@@ -385,7 +384,7 @@ namespace CustomUnityCli.Editor
             if (string.IsNullOrWhiteSpace(guid)) guid = args.GetString("targetGuid") ?? args.GetString("target_guid");
             if (string.IsNullOrWhiteSpace(rawPath))
             {
-                rawPath = args.GetString("targetPath") ?? args.GetString("target_path");
+                rawPath = args.GetFirstString("targetPath", "target_path", "path");
             }
 
             if (string.IsNullOrWhiteSpace(guid) && string.IsNullOrWhiteSpace(rawPath))

@@ -391,6 +391,13 @@ the folder stays read-only and upgradeable, and deleting `Library/CustomUnityCli
 
 ## Developing this package
 
+Agent instructions for this repository live in
+[`.agents/skills/custom-unity-cli/SKILL.md`](.agents/skills/custom-unity-cli/SKILL.md).
+
+**Commit messages are English only.** Use Conventional Commits
+(`type(scope): imperative summary`) with an English subject and body. Do not write
+Chinese (or mixed-language) git messages in this repository.
+
 ```powershell
 Tools/verify.ps1              # manifest, .meta coverage, command contract, offline Roslyn compile
 Tools/verify.ps1 -WithUnity   # adds the authoritative batchmode import into a throwaway project

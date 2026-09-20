@@ -239,6 +239,9 @@ git clone https://github.com/igp/custom-unity-cli.git Assets/Plugins/CustomUnity
 
 ## 验证与自测
 
+本仓库的 Agent 维护说明见 [`.agents/skills/custom-unity-cli/SKILL.md`](.agents/skills/custom-unity-cli/SKILL.md)。
+**Git 提交说明只用英文**（Conventional Commits：`type(scope): imperative summary`），不要写中文 commit message。
+
 两个工具回答两个不同的问题，都不需要关掉你的 Editor。
 
 ```powershell
