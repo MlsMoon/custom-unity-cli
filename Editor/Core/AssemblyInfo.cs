@@ -20,7 +20,7 @@ using System.Runtime.CompilerServices;
 
 // This grant is the one that actually matters for the zero-ceremony path.
 //
-// The recommended extension location is Assets/CustomUnityCli.Extensions/Editor/Commands/, which has
+// The recommended extension location is Assets/Plugins/CustomUnityCli.Extensions/Editor/Commands/, which has
 // NO asmdef and therefore compiles into Unity's predefined Assembly-CSharp-Editor. Without this line
 // those extensions could only reach the small public surface (CucliCommand, CucliArgs,
 // CucliCommandResult, ...) and would be locked out of the helper layer that makes writing a command

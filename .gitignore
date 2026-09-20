@@ -53,10 +53,11 @@ EditorSettings.asset
 # ---------------------------------------------------------------------------------------------
 # Project-local extensions must never be published with this package.
 #
-# The extension area defaults to <project>/Assets/CustomUnityCli.Extensions, which is already
-# outside this repository, so normally nothing here applies. These rules are a safety net for the
-# case where CUCLI_EXTENSIONS points inside the package, or someone drops project code into it by
-# hand. A project's own commands belong to the project, not to a published tool.
+# The extension area defaults to <project>/Assets/Plugins/CustomUnityCli.Extensions, a sibling of
+# this package folder and already outside this repository, so normally nothing here applies. These
+# rules are a safety net for the case where CUCLI_EXTENSIONS points inside the package, or someone
+# drops project code into it by hand. A project's own commands belong to the project, not to a
+# published tool.
 # ---------------------------------------------------------------------------------------------
 # Anchored to the package root on purpose: an unanchored "Extensions/" would also ignore a
 # directory of that name at any depth, including a future Editor/Commands/Extensions/.

@@ -637,6 +637,9 @@ namespace " + ns + @"
                         ? JValue.CreateNull()
                         : new JValue(descriptor.OptionalPackage),
                     ["effects"] = new JArray(descriptor.Effects ?? Array.Empty<string>()),
+                    ["surface"] = string.IsNullOrWhiteSpace(descriptor.Surface)
+                        ? "core"
+                        : descriptor.Surface,
                     ["actions"] = actions,
                     ["parametersSchema"] = SafeSchema(descriptor.ParametersSchemaJson)
                 });
@@ -771,6 +774,9 @@ namespace " + ns + @"
                         ? JValue.CreateNull()
                         : new JValue(descriptor.OptionalPackage),
                     ["effects"] = new JArray(descriptor.Effects ?? Array.Empty<string>()),
+                    ["surface"] = string.IsNullOrWhiteSpace(descriptor.Surface)
+                        ? "core"
+                        : descriptor.Surface,
                     ["actions"] = actions,
                     ["parametersSchema"] = SafeSchema(descriptor.ParametersSchemaJson)
                 });

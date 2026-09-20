@@ -136,11 +136,21 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
 
 Write-Section '2. meta coverage'
 
-$packageMetaFile = Join-Path $PackageRoot '.gitignore'
-$allFiles = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -Force -File |
-    Where-Object {
-        $_.FullName -notmatch '\\\.git\\' -and $_.FullName -notmatch '\\\.agents\\'
-    })
+function Test-UnityHiddenRelativePath {
+    param([string]$RelativePath)
+    foreach ($part in ($RelativePath -split '[\\/]')) {
+        if ([string]::IsNullOrEmpty($part)) { continue }
+        if ($part.StartsWith('.') -or $part.StartsWith('~') -or $part.EndsWith('~')) {
+            return $true
+        }
+    }
+    return $false
+}
+
+$allFiles = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -Force -File | Where-Object {
+    $relative = $_.FullName.Substring($PackageRoot.Length).TrimStart('\', '/')
+    -not (Test-UnityHiddenRelativePath $relative)
+})
 $assets = @($allFiles | Where-Object {
     $_.Extension -ne '.meta' -and $_.Name -notin @('.gitignore', '.gitattributes')
 })

@@ -71,7 +71,7 @@ First public release.
 - Unity Test Framework suites as pollable async jobs.
 - `selftest`: the tool testing itself through its own queue.
 
-In total **32 Editor command groups carrying 402 actions**, plus 9 offline groups.
+In total **32 Editor command groups carrying 417 actions**, plus 9 offline groups.
 
 **Self-verification**
 
@@ -83,9 +83,10 @@ In total **32 Editor command groups carrying 402 actions**, plus 9 offline group
 
 **Project-local extensions (self-iteration)**
 
-- An extension area outside the package, at `<project>/Assets/CustomUnityCli.Extensions` by default
-  and relocatable with `CUCLI_EXTENSIONS`, where a project grows its own command groups. A handful of
-  alternative folder names are discovered if the first choice is absent, and the root must be inside
+- An extension area outside the package, at
+  `<project>/Assets/Plugins/CustomUnityCli.Extensions` by default (a sibling of a plugin-folder
+  install, never inside this repository) and relocatable with `CUCLI_EXTENSIONS`. Legacy
+  `Assets/CustomUnityCli.Extensions` folders are still discovered. The root must be inside
   `Assets/` or `Packages/` or Unity would never compile it.
 - `cucli extend init|list|path` creates and inspects that area **with Unity closed**, so a project
   can start before the Editor has ever been opened.
@@ -167,5 +168,19 @@ All four found by running `cucli selftest` against the CLI itself.
   documented confirmation contract. Deleting a folder that contains a loaded scene is refused.
 - **`test run` crashed creating the UTF callbacks proxy** because `DispatchProxy` requires a public,
   non-sealed `TProxy`. `CucliTestCallbackProxy` now meets that contract.
+- **`extend path` treated `CustomUnityCli.Extensions` as inside the package.** A sibling folder
+  next to a plugin-folder install starts with the same `CustomUnityCli` prefix; the check now
+  requires a directory separator after the package root.
+- **A live-but-stalled worker refused to queue jobs.** Unfocused Editors keep a fresh heartbeat from
+  a background timer while `EditorApplication.update` is parked, so the CLI treated them as
+  `WORKER_UNAVAILABLE` and never wrote a job the worker could wake. Jobs now queue whenever the
+  heartbeat is live. On Windows the worker `PostMessage`s the Editor HWND and arms a main-thread
+  Win32 `SetTimer` that calls `QueuePlayerLoopUpdate`; it must never call Unity APIs from the
+  heartbeat thread. Modal dialogs still time out.
+- Package command groups are tagged `surface: core|extended`. Core lives under
+  `Editor/Commands/Core/`; Extended under `Editor/Commands/Extended/`. `cucli commands list
+  --surface core` filters, and `cucli selftest` defaults to Core (`-IncludeExtended` to probe the
+  rest).
+- Package documentation lives in `docs~` so Unity does not import those markdown files as assets.
 
-[0.1.0]: https://github.com/igp/custom-unity-cli/releases/tag/v0.1.0
+[0.1.0]: https://github.com/MlsMoon/custom-unity-cli/releases/tag/v0.1.0

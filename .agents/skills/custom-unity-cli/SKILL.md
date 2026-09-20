@@ -43,7 +43,7 @@ docs: require English Conventional Commit messages
 
 1. Stay inside this package root. `git status` here, not at the Unity project root.
 2. Do not commit host-project files, `Library/`, or `Assets/CucliSelfTest/`.
-3. Keep project-specific commands out of this package. See `docs/self-iteration.md`.
+3. Keep project-specific commands out of this package. See `docs~/self-iteration.md`.
 4. Run `Tools/verify.ps1` (no `-WithUnity` unless asked). It must pass.
 5. After Editor-facing behaviour changes, run `cucli selftest -Tier AB` against a live
    2022.3 worker when one is available.
@@ -51,7 +51,11 @@ docs: require English Conventional Commit messages
 ## Package boundary
 
 - Implementation lives in this folder. Host projects extend via
-  `Assets/CustomUnityCli.Extensions`, never by editing this package for one game.
+  `Assets/Plugins/CustomUnityCli.Extensions` (sibling of this package folder, never
+  inside it). Do not edit this package for one game.
+- Package commands are Core (`Editor/Commands/Core/`) or Extended
+  (`Editor/Commands/Extended/`). Do not grow the Core surface without an explicit
+  contract decision. Never call Unity Editor APIs from a background thread.
 - Do not add `com.igp.world-environment` or other host-only packages as dependencies.
 - Target is Unity **2022.3**. Do not re-scope the manifest floor without an explicit
   support decision.
@@ -60,6 +64,8 @@ docs: require English Conventional Commit messages
 
 ```powershell
 Tools/verify.ps1
-# optional, when an Editor worker is online:
+# optional, when an Editor worker is online (Core surface by default):
 ./Tools/cucli.ps1 selftest -Tier AB
+# include Extended groups:
+./Tools/cucli.ps1 selftest -Tier AB -IncludeExtended
 ```

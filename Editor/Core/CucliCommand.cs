@@ -22,6 +22,17 @@ namespace CustomUnityCli.Editor
         Offline = 3
     }
 
+    /// <summary>
+    /// Stability of a package command group. Core is the supported Editor CLI contract; Extended is
+    /// still registered and callable, but is not part of the default self-test or the stable surface.
+    /// Project-local commands stay <see cref="Core"/> - they belong to the host, not this layer.
+    /// </summary>
+    public enum CucliSurface
+    {
+        Core = 0,
+        Extended = 1
+    }
+
     /// <summary>One sub-action of a command group, as advertised by <c>cucli commands list</c>.</summary>
     public sealed class CucliActionInfo
     {
@@ -80,6 +91,12 @@ namespace CustomUnityCli.Editor
 
         /// <summary>Package that must be installed for this command to exist, or null.</summary>
         string OptionalPackage { get; }
+
+        /// <summary>
+        /// Core is the stable package contract; Extended is everything else the package ships.
+        /// Project commands should leave this at Core.
+        /// </summary>
+        CucliSurface Surface { get; }
 
         CucliCommandResult Execute(CucliCommandContext context);
     }
@@ -229,6 +246,8 @@ namespace CustomUnityCli.Editor
         public virtual bool MayReloadDomain => false;
 
         public virtual string OptionalPackage => null;
+
+        public virtual CucliSurface Surface => CucliSurface.Core;
 
         public abstract CucliCommandResult Execute(CucliCommandContext context);
 

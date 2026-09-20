@@ -19,7 +19,7 @@ namespace CustomUnityCli.Editor
     /// upstream through the published <c>commands/registry.json</c>.
     ///
     /// <code>
-    /// Assets/CustomUnityCli.Extensions/
+    /// Assets/Plugins/CustomUnityCli.Extensions/
     /// |-- README.md
     /// |-- extensions.json          optional: project aliases and offline groups
     /// |-- Notes/                   free-form project invariants an agent can rediscover
@@ -47,15 +47,15 @@ namespace CustomUnityCli.Editor
         /// <summary>Project-relative folders searched for extension code, most preferred first.</summary>
         public static readonly string[] CandidateFolders =
         {
+            "Assets/Plugins/CustomUnityCli.Extensions",
             "Assets/CustomUnityCli.Extensions",
             "Assets/CustomUnityCliExtensions",
-            "Assets/Plugins/CustomUnityCli.Extensions",
             "Assets/Editor/CustomUnityCli.Extensions",
             "Packages/CustomUnityCli.Extensions"
         };
 
         /// <summary>Where <c>cucli meta new-command</c> writes by default.</summary>
-        public const string PreferredFolder = "Assets/CustomUnityCli.Extensions";
+        public const string PreferredFolder = "Assets/Plugins/CustomUnityCli.Extensions";
 
         /// <summary>Overrides <see cref="PreferredFolder"/>. Absolute or project-relative.</summary>
         public const string EnvironmentVariable = "CUCLI_EXTENSIONS";

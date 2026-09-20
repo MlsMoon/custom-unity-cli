@@ -52,9 +52,6 @@ namespace CustomUnityCli.Editor
         /// <summary>Last time the editor loop turned. Written by the main thread, read by the timer.</summary>
         private static volatile string s_mainThreadTickUtc;
 
-        /// <summary>Set by <see cref="PendingWorkExists"/> on the timer thread, consumed by the main thread.</summary>
-        private static volatile bool s_workPending;
-
         static CucliWorkerBootstrap()
         {
             if (AssetDatabase.IsAssetImportWorkerProcess()) return;
@@ -99,14 +96,13 @@ namespace CustomUnityCli.Editor
                     CucliCommandRegistry.WriteCatalog();
                     CucliConsoleCapture.Initialize(SessionId);
                     CucliJobProcessor.Initialize();
+                    CucliMainLoopWake.Initialize();
                     s_initialized = true;
                 }
 
                 CucliConsoleCapture.Flush();
                 CucliJobProcessor.Tick();
-                // The main thread has just drained whatever the timer thread was advertising, so the
-                // next pending-work sighting is allowed to nudge again.
-                s_workPending = false;
+                CucliMainLoopWake.TickMainThread();
 
                 if (DateTime.UtcNow >= s_nextStateSampleUtc)
                 {
@@ -157,19 +153,14 @@ namespace CustomUnityCli.Editor
         /// </summary>
         private static void OnTimerTick()
         {
-            // The timer thread publishes the heartbeat and does nothing else.
-            //
-            // It must never touch a Unity API. An earlier revision called
-            // EditorApplication.QueuePlayerLoopUpdate() from here to nudge a throttled Editor into
-            // draining the queue, and that off-main-thread Editor call wedged the Editor's main loop
-            // permanently: state sampling and Editor.log both stopped at the same instant, CPU stayed
-            // at exactly 0% for minutes, and the Win32 message pump kept answering - a blocked main
-            // thread, not a modal dialog and not focus throttling. A try/catch cannot make such a call
-            // safe, because the failure mode is a corrupted native state, not a managed exception.
-            //
-            // Losing the nudge costs nothing that matters: the main thread drains the queue on its next
-            // natural tick, and `stalled` in the heartbeat is what tells a caller that no tick is coming.
+            // 1. Publish a liveness heartbeat.
+            // 2. If work is queued, PostMessage(WM_NULL) to the Editor HWND so a throttled
+            //    unfocused loop turns. Never call Unity APIs from this thread.
             PublishHeartbeat();
+            if (PendingWorkExists() || CucliMainLoopWake.HasWork())
+            {
+                CucliMainLoopWake.RequestFromBackground();
+            }
         }
 
         /// <summary>Cheap directory probe. Runs off the main thread, so it touches only the filesystem.</summary>
@@ -197,30 +188,6 @@ namespace CustomUnityCli.Editor
             catch (Exception)
             {
                 return false;
-            }
-        }
-
-        /// <summary>
-        /// DO NOT CALL THIS. Kept only so the hazard is documented rather than rediscovered.
-        ///
-        /// It exists to ask the editor loop to turn once so a pending job is picked up without the
-        /// user focusing the window - a real problem worth solving. This implementation solved it by
-        /// calling <c>EditorApplication.QueuePlayerLoopUpdate()</c> off the main thread, which is not
-        /// safe and did wedge the Editor permanently. Any future attempt must use a mechanism Unity
-        /// documents as main-thread-only reachable, or must accept the wait.
-        /// </summary>
-        private static void NudgeMainLoop()
-        {
-            if (s_workPending) return;
-            s_workPending = true;
-            try
-            {
-                EditorApplication.QueuePlayerLoopUpdate();
-            }
-            catch (Exception)
-            {
-                // Off-main-thread refusal is acceptable: the next natural tick still drains the queue.
-                s_workPending = false;
             }
         }
 
@@ -335,6 +302,7 @@ namespace CustomUnityCli.Editor
 
             CucliConsoleCapture.Shutdown();
             CucliJobProcessor.Shutdown();
+            CucliMainLoopWake.Shutdown();
 
             try
             {

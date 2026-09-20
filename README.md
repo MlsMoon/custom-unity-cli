@@ -1,10 +1,16 @@
 # Custom Unity CLI
 
+[![Unity](https://img.shields.io/badge/Unity-2022.3-black.svg?logo=unity)](https://unity.com/releases/editor/whats-new/2022.3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%20%2F%207+-5391FE.svg?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
+
 **A zero-configuration command line interface for the Unity Editor.**
 
 `cucli` drives Unity from a terminal, a CI job or an AI agent without a socket, a server, an SDK
 download or a single line of per-project configuration. Drop one folder into your project and the
 whole Editor becomes scriptable.
+
+> **Unity 2022.3 only.** Unity 6 projects should use [Unity CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference) instead. See [Compatibility](#compatibility--read-this-first).
 
 ```powershell
 # No install step, no config file, no server to start.
@@ -16,6 +22,17 @@ whole Editor becomes scriptable.
 ```
 
 [中文说明见 `README.zh-CN.md`](README.zh-CN.md)
+
+## Contents
+
+- [Compatibility](#compatibility--read-this-first)
+- [Why another Unity CLI?](#why-another-unity-cli)
+- [What it can do](#what-it-can-do)
+- [Installation](#installation)
+- [Everyday usage](#everyday-usage)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
@@ -90,9 +107,10 @@ result file. That single design choice buys most of the properties below.
 
 ## What it can do
 
-**32 Editor command groups carrying 402 actions**, plus 9 offline groups that need no Editor at all.
-Run `cucli commands list` for the exact surface of your build, and `cucli commands describe <group>`
-for one group's parameter schema.
+**32 Editor command groups carrying 417 actions**, split into a **Core** contract and **Extended**
+groups that stay registered but are not the default self-test surface. Plus 9 offline groups that
+need no Editor at all. Run `cucli commands list --surface core` (or `extended`) to filter, and
+`cucli commands describe <group>` for one group's parameter schema.
 
 **Offline — works with Unity closed**
 
@@ -107,7 +125,7 @@ for one group's parameter schema.
 | `open` | Launch Unity for this project (prefers an existing Unity Hub instance). |
 | `version` | Versions of CLI, package and PowerShell. |
 
-**Editor — needs a live worker**
+**Editor Core — stable contract, default self-test**
 
 | Group | Covers |
 | --- | --- |
@@ -120,6 +138,16 @@ for one group's parameter schema.
 | `script` | Read/write/validate C# files, precise text edits, content hashes. |
 | `so` | ScriptableObject create/modify with `dryRun` validation. |
 | `material`, `shader`, `texture` | Material properties, shader source, procedural textures and import settings. |
+| `console` | Read and clear captured console output with level, regex and time filters. |
+| `capture` | Game view, Scene view and multiview screenshots. |
+| `test` | Run Unity Test Framework suites as an async job and poll for results. |
+| `meta` | Dump the runtime catalog, export the static registry, report the environment, scaffold project-local commands. |
+| `selftest` | The tool testing itself: introspection assertions, an action safety surface, a sample report. |
+
+**Editor Extended — still callable; `cucli selftest -IncludeExtended` to probe them**
+
+| Group | Covers |
+| --- | --- |
 | `ui` | UI Toolkit documents, elements, inline styles and USS classes. |
 | `graphics` | Environment, skybox, fog, reflection, sun, lightmap baking, quality levels, URP render-pipeline settings and volume profiles. |
 | `camera` | Camera inspection and configuration; Cinemachine when installed. |
@@ -128,19 +156,14 @@ for one group's parameter schema.
 | `probuilder` | ProBuilder mesh operations (when `com.unity.probuilder` is installed). |
 | `vfx` | VFX Graph, particle systems, trails and lines (when `com.unity.visualeffectgraph` is installed). |
 | `profiler` | Profiler sessions, sampling, counters, object memory, exports. |
-| `console` | Read and clear captured console output with level, regex and time filters. |
-| `test` | Run Unity Test Framework suites as an async job and poll for results. |
 | `memory` | Asset-reference and object-memory audits. |
 | `frame` | Frame inspection and multi-frame capture sequences. |
 | `input` | Synthesise clicks, drags and key events into the Editor; inspect UI under the pointer. |
 | `recorder` | Screenshots and recording sessions. |
-| `capture` | Game view, Scene view and multiview screenshots. |
 | `build` | Player builds as async jobs, build targets, scenes, settings. |
 | `package` | Package Manager add/remove/embed/search, scoped registries. |
 | `code` | Execute a C# snippet and batch several operations in one round trip. |
 | `reflect` | Look up Unity types, members and signatures at runtime. |
-| `meta` | Dump the runtime catalog, export the static registry, report the environment, scaffold project-local commands. |
-| `selftest` | The tool testing itself: introspection assertions, an action safety surface, a sample report. |
 
 ## Installation
 
@@ -153,7 +176,7 @@ The repository root **is** the Unity package root, so it can be installed either
 **As a plugin folder (recommended — one directory, no manifest change):**
 
 ```powershell
-git clone https://github.com/igp/custom-unity-cli.git Assets/Plugins/CustomUnityCli
+git clone https://github.com/MlsMoon/custom-unity-cli.git Assets/Plugins/CustomUnityCli
 ```
 
 **As a UPM package** (add to `Packages/manifest.json`):
@@ -161,7 +184,7 @@ git clone https://github.com/igp/custom-unity-cli.git Assets/Plugins/CustomUnity
 ```json
 {
   "dependencies": {
-    "com.igp.custom-unity-cli": "https://github.com/igp/custom-unity-cli.git"
+    "com.igp.custom-unity-cli": "https://github.com/MlsMoon/custom-unity-cli.git"
   }
 }
 ```
@@ -300,8 +323,8 @@ The registry discovers it by reflection on the next domain reload, publishes it 
 `worker/commands.json`, and `cucli hello say --who unity` works immediately. Nothing else to
 register, no CLI change, no manifest edit.
 
-See [`docs/extension.md`](docs/extension.md) for the full contract and
-[`docs/protocol.md`](docs/protocol.md) for the file protocol.
+See [`docs~/extension.md`](docs~/extension.md) for the full contract and
+[`docs~/protocol.md`](docs~/protocol.md) for the file protocol.
 
 ### Growing the tool per project — without ever publishing it
 
@@ -312,7 +335,7 @@ grow that way, and built so the result **cannot end up in this repository**.
 The extension area is a folder in the *project*, outside the package:
 
 ```text
-<project>/Assets/CustomUnityCli.Extensions/
+<project>/Assets/Plugins/CustomUnityCli.Extensions/
 ├── extensions.json           project manifest: aliases and offline groups
 ├── registry.local.json       generated: this project's own command catalog
 ├── README.md                 explains the area to whoever finds it
@@ -358,7 +381,7 @@ at the next merge conflict.
 
 The intended workflow: a project iterates on its own commands freely. When one turns out to be useful
 everywhere, it gets upstreamed deliberately as a reviewed change — never as a side effect of running
-a command. [`docs/self-iteration.md`](docs/self-iteration.md) covers the whole arrangement, including
+a command. [`docs~/self-iteration.md`](docs~/self-iteration.md) covers the whole arrangement, including
 the `Notes/` folder that lets the next iteration start from what the last one learned.
 
 ## Layout
@@ -372,7 +395,7 @@ Assets/Plugins/CustomUnityCli/          the repository root is the package root
 │   ├── Core/                           protocol, job queue, console capture, reflection helpers
 │   └── Commands/                       command groups, one file per group
 ├── Tools/cucli.ps1                     the entire CLI: parser, offline commands, job transport
-└── docs/
+└── docs~/                              package docs (Unity ignores folders ending in ~)
 ```
 
 Runtime state lives only in `Library/CustomUnityCli/`. Nothing is written back into the package, so
@@ -380,12 +403,12 @@ the folder stays read-only and upgradeable, and deleting `Library/CustomUnityCli
 
 ## Documentation
 
-- [`docs/protocol.md`](docs/protocol.md) — the file protocol in full: job lifecycle, domain reload
+- [`docs~/protocol.md`](docs~/protocol.md) — the file protocol in full: job lifecycle, domain reload
   contract, cancellation, atomic writes.
-- [`docs/extension.md`](docs/extension.md) — writing a command group.
-- [`docs/self-iteration.md`](docs/self-iteration.md) — how a project grows its own commands without
+- [`docs~/extension.md`](docs~/extension.md) — writing a command group.
+- [`docs~/self-iteration.md`](docs~/self-iteration.md) — how a project grows its own commands without
   ever publishing them.
-- [`docs/mcp-parity.md`](docs/mcp-parity.md) — tool-by-tool mapping from MCP for Unity, and the
+- [`docs~/mcp-parity.md`](docs~/mcp-parity.md) — tool-by-tool mapping from MCP for Unity, and the
   deliberate differences.
 - [`CHANGELOG.md`](CHANGELOG.md)
 
@@ -440,11 +463,17 @@ does not do it, and does not require it:
 - Before the worker has ever been compiled, no out-of-process tool can make the Editor recompile.
   Use `verify.ps1` above; the Editor will pick the change up whenever it is next focused, and nothing
   about your session is disturbed in the meantime.
-- Once the worker is compiled, it polls its own job queue from `EditorApplication.update` and calls
-  `RequestScriptCompilation()` itself, so `cucli refresh compile --wait` works with Unity in the
-  background.
+- Once the worker is compiled, it polls its own job queue from `EditorApplication.update`. On
+  Windows an unfocused Editor is woken with a Win32 `PostMessage` plus a main-thread `SetTimer`
+  that calls `QueuePlayerLoopUpdate`, so `cucli refresh compile --wait` works with Unity in the
+  background. Never call Unity APIs from the heartbeat thread.
 - `cucli open` starts Unity, but only because you asked it to.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Commit messages are English Conventional Commits. Package
+docs live in `docs~` so Unity does not import them as assets.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE). Copyright (c) 2026 [MlsMoon](https://github.com/MlsMoon).

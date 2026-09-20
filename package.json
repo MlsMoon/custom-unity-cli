@@ -15,12 +15,13 @@
     "workflow"
   ],
   "author": {
-    "name": "igp"
+    "name": "MlsMoon",
+    "url": "https://github.com/MlsMoon"
   },
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.2.1"
   },
-  "documentationUrl": "https://github.com/igp/custom-unity-cli#readme",
-  "changelogUrl": "https://github.com/igp/custom-unity-cli/blob/main/CHANGELOG.md",
-  "licensesUrl": "https://github.com/igp/custom-unity-cli/blob/main/LICENSE"
+  "documentationUrl": "https://github.com/MlsMoon/custom-unity-cli#readme",
+  "changelogUrl": "https://github.com/MlsMoon/custom-unity-cli/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/MlsMoon/custom-unity-cli/blob/main/LICENSE"
 }

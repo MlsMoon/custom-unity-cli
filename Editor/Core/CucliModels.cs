@@ -124,6 +124,12 @@ namespace CustomUnityCli.Editor
         public string[] Effects { get; set; }
         public bool MayReloadDomain { get; set; }
         public string OptionalPackage { get; set; }
+
+        /// <summary>
+        /// <c>core</c> or <c>extended</c>. Package groups only; project commands report <c>core</c>
+        /// because the host owns them, not because they are part of this package's stable contract.
+        /// </summary>
+        public string Surface { get; set; }
     }
 
     internal sealed class CucliCommandDiagnostic

@@ -239,7 +239,8 @@ namespace CustomUnityCli.Editor
                 MayReloadDomain = command.MayReloadDomain,
                 OptionalPackage = string.IsNullOrWhiteSpace(command.OptionalPackage)
                     ? null
-                    : command.OptionalPackage
+                    : command.OptionalPackage,
+                Surface = SurfaceName(command.Surface)
             };
         }
 
@@ -328,6 +329,11 @@ namespace CustomUnityCli.Editor
             }
         }
 
+        private static string SurfaceName(CucliSurface surface)
+        {
+            return surface == CucliSurface.Extended ? "extended" : "core";
+        }
+
         private static void AddDiagnostic(string code, Type type, string commandName, string message)
         {
             Diagnostics.Add(new CucliCommandDiagnostic
@@ -358,6 +364,7 @@ namespace CustomUnityCli.Editor
                     .Append(descriptor.MayReloadDomain ? '1' : '0')
                     .Append('\u001f')
                     .Append(descriptor.OptionalPackage ?? string.Empty).Append('\u001f')
+                    .Append(descriptor.Surface ?? "core").Append('\u001f')
                     .Append(string.Join(",", descriptor.Effects ?? Array.Empty<string>()))
                     .Append('\u001f')
                     .Append(string.Join(",",

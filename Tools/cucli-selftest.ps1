@@ -42,6 +42,10 @@
     Also run the skipped-but-slow actions (compilation, package resolve, test run). Never enables a
     real player build, light baking or a manifest write.
 
+.PARAMETER IncludeExtended
+    Also probe Extended package groups (build, profiler, vfx, URP, ...). Default self-test covers
+    the Core surface only.
+
 .PARAMETER Report
     Markdown report path. Defaults to Library/CustomUnityCli/selftest-report.md.
 
@@ -70,6 +74,7 @@ $Script:OptionGroup = @()
 $Script:OptionAction = @()
 $Script:OptionTier = 'ABC'
 $Script:OptionIncludeHeavy = $false
+$Script:OptionIncludeExtended = $false
 $Script:OptionReport = $null
 $Script:OptionTimeoutSec = 120
 $Script:OptionKeepSandbox = $false
@@ -86,6 +91,7 @@ for ($i = 0; $i -lt $raw.Count; $i++) {
         '^-+Report$'          { $Script:OptionReport = $next; $i++ }
         '^-+TimeoutSec$'      { $Script:OptionTimeoutSec = [int]$next; $i++ }
         '^-+IncludeHeavy$'    { $Script:OptionIncludeHeavy = $true }
+        '^-+IncludeExtended$' { $Script:OptionIncludeExtended = $true }
         '^-+KeepSandbox$'     { $Script:OptionKeepSandbox = $true }
         '^-+(h|help|\?)$'     { $Script:ShowHelp = $true }
         '^-+Group=(.*)$'      { $Script:OptionGroup = @($Matches[1] -split ',') }
@@ -826,6 +832,7 @@ Write-Host "  cli     : $($Script:Cli)"
 Write-Host "  tiers   : $($Script:OptionTier)"
 Write-Host "  groups  : $(if ($Script:OptionGroup.Count) { $Script:OptionGroup -join ',' } else { 'all' })"
 Write-Host "  heavy   : $($Script:OptionIncludeHeavy)"
+Write-Host "  extended: $($Script:OptionIncludeExtended)"
 
 $Script:ProjectRoot = Find-ProjectRoot -Start $Script:SelfDir
 if (-not $Script:ProjectRoot) { $Script:ProjectRoot = Find-ProjectRoot -Start (Get-Location).Path }
@@ -842,6 +849,13 @@ if (-not $catalog) {
 }
 
 foreach ($group in $catalog.commands) {
+    $surface = 'core'
+    if ($group.PSObject.Properties['surface'] -and $group.surface) {
+        $surface = ([string]$group.surface).ToLowerInvariant()
+    }
+    if (-not $Script:OptionIncludeExtended -and $Script:OptionGroup.Count -eq 0 -and $surface -eq 'extended') {
+        continue
+    }
     $map = @{}
     foreach ($action in @($group.actions)) { $map[$action.name] = $true }
     $Script:CatalogMap[$group.name] = $map

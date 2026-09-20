@@ -1,9 +1,15 @@
 # Custom Unity CLI
 
+[![Unity](https://img.shields.io/badge/Unity-2022.3-black.svg?logo=unity)](https://unity.com/releases/editor/whats-new/2022.3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%20%2F%207+-5391FE.svg?logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
+
 **面向 Unity Editor 的零配置命令行工具。**
 
 `cucli` 让你从终端、CI 或 AI Agent 驱动 Unity，不需要端口、不需要常驻服务、不需要下载 SDK，
 也不需要为每个工程写一行配置。往工程里丢一个目录，整个 Editor 就变成可脚本化的。
+
+> **仅支持 Unity 2022.3。** Unity 6 工程请改用 [Unity CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)。详见 [兼容性](#兼容性--先读这一段)。
 
 ```powershell
 # 没有安装步骤，没有配置文件，没有要启动的服务。
@@ -15,6 +21,16 @@
 ```
 
 [English README](README.md)
+
+## 目录
+
+- [兼容性](#兼容性--先读这一段)
+- [为什么要再做一个 Unity CLI](#为什么要再做一个-unity-cli)
+- [能做什么](#能做什么)
+- [安装](#安装)
+- [文档](#文档)
+- [贡献](#贡献)
+- [许可](#许可)
 
 ---
 
@@ -82,8 +98,8 @@ CLI 写一个作业文件；Editor Worker 在下一个 update tick 取走执行�
 
 ## 能做什么
 
-**32 个 Editor 命令组、402 个 action**，另有 9 个完全不需要 Editor 的离线命令组。
-用 `cucli commands list` 看你这份构建的确切能力面，
+**32 个 Editor 命令组、417 个 action**，分成 **Core** 稳定契约和 **Extended** 高风险组（仍可调用，但不是默认自测范围），另有 9 个完全不需要 Editor 的离线命令组。
+用 `cucli commands list --surface core`（或 `extended`）过滤，
 用 `cucli commands describe <group>` 看某一组的参数 Schema。
 
 **离线 —— Unity 关着也能用**
@@ -99,7 +115,7 @@ CLI 写一个作业文件；Editor Worker 在下一个 update tick 取走执行�
 | `open` | 拉起本工程的 Unity（优先复用已开的 Unity Hub 实例）。 |
 | `version` | CLI、包、PowerShell 版本。 |
 
-**Editor —— 需要 Worker 在线**
+**Editor Core —— 稳定契约，默认自测**
 
 | 命令组 | 覆盖内容 |
 | --- | --- |
@@ -112,6 +128,16 @@ CLI 写一个作业文件；Editor Worker 在下一个 update tick 取走执行�
 | `script` | C# 文件读写与校验、精确文本编辑、内容哈希。 |
 | `so` | ScriptableObject 创建与修改，支持 `dryRun` 校验。 |
 | `material`、`shader`、`texture` | 材质属性、Shader 源码、程序化贴图与导入设置。 |
+| `console` | 按级别、正则、时间读取与清空 Console。 |
+| `capture` | Game 视图、Scene 视图、多视图截图。 |
+| `test` | 以异步作业运行 Unity Test Framework 套件并轮询结果。 |
+| `meta` | 导出运行期目录、生成静态 registry、报告环境、脚手架项目专属命令。 |
+| `selftest` | 工具自测：内省断言、action 安全性面、示例报告。 |
+
+**Editor Extended —— 仍可调用；`cucli selftest -IncludeExtended` 才会默认探测**
+
+| 命令组 | 覆盖内容 |
+| --- | --- |
 | `ui` | UI Toolkit 文档、元素、内联样式与 USS 类。 |
 | `graphics` | 环境、天空盒、雾、反射、太阳、光照烘焙、质量等级、URP 管线设置与 Volume。 |
 | `camera` | 相机检查与配置；装了 Cinemachine 时含 Cinemachine。 |
@@ -120,19 +146,14 @@ CLI 写一个作业文件；Editor Worker 在下一个 update tick 取走执行�
 | `probuilder` | ProBuilder 网格操作（需 `com.unity.probuilder`）。 |
 | `vfx` | VFX Graph、粒子系统、拖尾、线段（需 `com.unity.visualeffectgraph`）。 |
 | `profiler` | Profiler 会话、采样、计数器、对象内存、导出。 |
-| `console` | 按级别、正则、时间读取与清空 Console。 |
-| `test` | 以异步作业运行 Unity Test Framework 套件并轮询结果。 |
 | `memory` | 资产引用与对象内存审计。 |
 | `frame` | 单帧检查与连续多帧抓取。 |
 | `input` | 向 Editor 合成点击、拖拽、按键；检查光标下的 UI。 |
 | `recorder` | 截图与录制会话。 |
-| `capture` | Game 视图、Scene 视图、多视图截图。 |
 | `build` | 以异步作业执行 Player 构建、构建目标、场景、设置。 |
 | `package` | Package Manager 增删、嵌入、搜索、scoped registry。 |
 | `code` | 执行 C# 片段，以及一次往返批量执行多个操作。 |
 | `reflect` | 运行期查询 Unity 类型、成员与签名。 |
-| `meta` | 导出运行期目录、生成静态 registry、报告环境、脚手架项目专属命令。 |
-| `selftest` | 工具自测：内省断言、action 安全性面、示例报告。 |
 
 ## 安装
 
@@ -145,7 +166,7 @@ CLI 写一个作业文件；Editor Worker 在下一个 update tick 取走执行�
 **作为 plugin 目录（推荐 —— 一个目录，不动 manifest）：**
 
 ```powershell
-git clone https://github.com/igp/custom-unity-cli.git Assets/Plugins/CustomUnityCli
+git clone https://github.com/MlsMoon/custom-unity-cli.git Assets/Plugins/CustomUnityCli
 ```
 
 **作为 UPM 包**（加进 `Packages/manifest.json`）：
@@ -153,7 +174,7 @@ git clone https://github.com/igp/custom-unity-cli.git Assets/Plugins/CustomUnity
 ```json
 {
   "dependencies": {
-    "com.igp.custom-unity-cli": "https://github.com/igp/custom-unity-cli.git"
+    "com.igp.custom-unity-cli": "https://github.com/MlsMoon/custom-unity-cli.git"
   }
 }
 ```
@@ -319,7 +340,7 @@ namespace CustomUnityCli.Editor
 注册表会在下次 Domain Reload 时靠反射发现它，发布到 `worker/commands.json`，
 然后 `cucli hello say --who unity` 立刻可用。不用再注册别的东西，不用改 CLI，不用改 manifest。
 
-完整契约见 [`docs/extension.md`](docs/extension.md)，文件协议见 [`docs/protocol.md`](docs/protocol.md)。
+完整契约见 [`docs~/extension.md`](docs~/extension.md)，文件协议见 [`docs~/protocol.md`](docs~/protocol.md)。
 
 ### 按项目自我迭代 —— 但永远不会被发布出去
 
@@ -329,7 +350,7 @@ namespace CustomUnityCli.Editor
 扩展区是**项目里**的一个目录，位于包之外：
 
 ```text
-<工程>/Assets/CustomUnityCli.Extensions/
+<工程>/Assets/Plugins/CustomUnityCli.Extensions/
 ├── extensions.json           项目清单：别名与离线命令组
 ├── registry.local.json       生成物：本项目自己的命令目录
 ├── README.md                 向发现这个目录的人解释它是什么
@@ -373,7 +394,7 @@ namespace CustomUnityCli.Editor
 
 预期的工作方式是：项目自由迭代自己的命令；当某条命令被证明到处都有用时，再把它作为一次**被审阅的
 变更**主动上游，而不是让它在跑命令时顺手溜进去。完整安排（包括让下一轮迭代能接着上一轮所学继续的
-`Notes/` 目录）见 [`docs/self-iteration.md`](docs/self-iteration.md)。
+`Notes/` 目录）见 [`docs~/self-iteration.md`](docs~/self-iteration.md)。
 
 ## 目录结构
 
@@ -386,7 +407,7 @@ Assets/Plugins/CustomUnityCli/          仓库根 == 包根
 │   ├── Core/                           协议、作业队列、Console 抓取、反射工具
 │   └── Commands/                       命令组，一组一个文件
 ├── Tools/cucli.ps1                     整个 CLI：参数解析、离线命令、作业传输
-└── docs/
+└── docs~/                              包文档（以 ~ 结尾的目录 Unity 不会导入）
 ```
 
 运行期状态只写在 `Library/CustomUnityCli/`。不会回写包目录，因此这个目录始终保持只读可升级，
@@ -394,14 +415,19 @@ Assets/Plugins/CustomUnityCli/          仓库根 == 包根
 
 ## 文档
 
-- [`docs/protocol.md`](docs/protocol.md) —— 完整的文件协议：作业生命周期、Domain Reload 契约、
+- [`docs~/protocol.md`](docs~/protocol.md) —— 完整的文件协议：作业生命周期、Domain Reload 契约、
   取消、原子写入。
-- [`docs/extension.md`](docs/extension.md) —— 如何写一个命令组。
-- [`docs/self-iteration.md`](docs/self-iteration.md) —— 项目如何在**不被发布出去**的前提下长出
+- [`docs~/extension.md`](docs~/extension.md) —— 如何写一个命令组。
+- [`docs~/self-iteration.md`](docs~/self-iteration.md) —— 项目如何在**不被发布出去**的前提下长出
   自己的命令。
-- [`docs/mcp-parity.md`](docs/mcp-parity.md) —— 与 MCP for Unity 的逐工具对照，以及刻意保留的差异。
+- [`docs~/mcp-parity.md`](docs~/mcp-parity.md) —— 与 MCP for Unity 的逐工具对照，以及刻意保留的差异。
 - [`CHANGELOG.md`](CHANGELOG.md)
+
+## 贡献
+
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。提交说明只用英文 Conventional Commits。包文档放在 `docs~`，
+Unity 不会把这些 markdown 当资产导入。
 
 ## 许可
 
-[MIT](LICENSE)。
+[MIT](LICENSE)。Copyright (c) 2026 [MlsMoon](https://github.com/MlsMoon)。

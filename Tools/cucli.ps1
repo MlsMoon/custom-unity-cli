@@ -59,13 +59,13 @@ $Script:ScriptRoot = $PSScriptRoot
 # Project-local extension area. Must match CucliExtensionPaths.CandidateFolders and
 # CucliExtensionPaths.PreferredFolder in the Editor assembly, in this exact order.
 $Script:ExtensionCandidates = @(
+    'Assets/Plugins/CustomUnityCli.Extensions'
     'Assets/CustomUnityCli.Extensions'
     'Assets/CustomUnityCliExtensions'
-    'Assets/Plugins/CustomUnityCli.Extensions'
     'Assets/Editor/CustomUnityCli.Extensions'
     'Packages/CustomUnityCli.Extensions'
 )
-$Script:ExtensionPreferredFolder = 'Assets/CustomUnityCli.Extensions'
+$Script:ExtensionPreferredFolder = 'Assets/Plugins/CustomUnityCli.Extensions'
 # Must match CucliExtensionPaths.LocalRegistryFileName.
 $Script:ExtensionRegistryFileName = 'registry.local.json'
 
@@ -254,6 +254,19 @@ function Get-PackageRoot {
     return (Split-Path -Parent $Script:ScriptRoot)
 }
 
+function Test-IsInsidePackage {
+    <#
+        Directory-boundary prefix: 'CustomUnityCli.Extensions' must NOT match the package folder
+        'CustomUnityCli'. Always append a trailing separator to the package root before StartsWith.
+    #>
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    $packageFull = [System.IO.Path]::GetFullPath((Get-PackageRoot)).TrimEnd('\', '/') +
+        [System.IO.Path]::DirectorySeparatorChar
+    $candidate = [System.IO.Path]::GetFullPath($Path)
+    return $candidate.StartsWith($packageFull, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 function Get-RuntimeRoot {
     param([string]$ProjectRoot)
     return (Join-Path $ProjectRoot 'Library/CustomUnityCli')
@@ -384,20 +397,35 @@ function Get-HeartbeatStateAgeSeconds {
     return Get-TimestampAgeSeconds $Heartbeat.stateSampledAtUtc
 }
 
-function Test-WorkerOnline {
+function Test-WorkerAlive {
     <#
-        True only when the worker can actually execute a job.
+        True when the Editor process is still publishing a heartbeat.
 
-        Both timestamps must be fresh. Requiring the state sample as well is what stops the CLI from
-        queuing work into a frozen Editor and reporting success until a timeout - the failure mode
-        that makes a driving tool untrustworthy rather than merely broken.
+        This is the gate for *queuing* work. The heartbeat is rewritten from a background timer, so
+        it stays fresh while the window is unfocused. The main thread may still be stalled; the
+        worker is responsible for waking it after the job file lands.
     #>
-    param([string]$ProjectRoot, [int]$MaxAgeSeconds = 15, [int]$MaxStateAgeSeconds = 5)
+    param([string]$ProjectRoot, [int]$MaxAgeSeconds = 15)
 
     $heartbeat = Get-Heartbeat $ProjectRoot
     $age = Get-HeartbeatAgeSeconds $heartbeat
     if ($null -eq $age -or $age -gt $MaxAgeSeconds) { return $false }
+    return $true
+}
 
+function Test-WorkerOnline {
+    <#
+        True when the worker can execute a job on this tick, without waiting for a wake.
+
+        Both timestamps must be fresh. A live-but-stalled Editor is still *alive* (see
+        Test-WorkerAlive) and will accept queued work; this function is the honest "executing now"
+        signal used by `cucli status`.
+    #>
+    param([string]$ProjectRoot, [int]$MaxAgeSeconds = 15, [int]$MaxStateAgeSeconds = 5)
+
+    if (-not (Test-WorkerAlive -ProjectRoot $ProjectRoot -MaxAgeSeconds $MaxAgeSeconds)) { return $false }
+
+    $heartbeat = Get-Heartbeat $ProjectRoot
     $stateAge = Get-HeartbeatStateAgeSeconds $heartbeat
     # A heartbeat without a state sample is from an older worker; fall back to the timestamp alone.
     if ($null -eq $stateAge) { return $true }
@@ -935,10 +963,10 @@ function Get-WorkerStallHint {
     $pending = if ($heartbeat.PSObject.Properties['pendingJobCount']) { [int]$heartbeat.pendingJobCount } else { 0 }
     $pendingNote = if ($pending -gt 0) { " $pending job(s) are queued and unserviced." } else { '' }
 
-    return "$pendingNote The Editor's main thread has not ticked for $age seconds, so the queue cannot drain: " +
-           "Unity is blocked in a synchronous operation or a modal dialog. Job execution happens on that " +
-           "thread, so waiting longer will not help. Bring the Unity window to the front to check for a " +
-           "dialog, or restart the Editor; queued jobs survive a restart."
+    return "$pendingNote The Editor's main thread has not ticked for $age seconds, so the queue cannot drain. " +
+           "If the window is only unfocused the worker should have woken it; a timeout here usually means a " +
+           "modal dialog or a frozen native thread. Bring the Unity window to the front to check, or restart " +
+           "the Editor; queued jobs survive a restart."
 }
 
 function Find-JobFile {
@@ -1190,6 +1218,15 @@ function Get-GroupActionObjects {
     return $result.ToArray()
 }
 
+function Get-GroupSurface {
+    param($Group)
+    if ($null -eq $Group) { return 'core' }
+    if ($Group.PSObject.Properties['surface'] -and -not [string]::IsNullOrWhiteSpace([string]$Group.surface)) {
+        return ([string]$Group.surface).Trim().ToLowerInvariant()
+    }
+    return 'core'
+}
+
 function Test-ControlAction {
     <# A project may add its own control actions, so both registries are consulted. #>
     param($Index, [string]$ProjectRoot, [string]$Group, [string]$Action)
@@ -1230,8 +1267,10 @@ function Invoke-HostStatus {
     $data = [ordered]@{
         worker = [ordered]@{
             online        = $online
-            # 'stalled' is the field to read when something looks alive but nothing happens: the
-            # heartbeat is fresh (background timer) yet the main thread has stopped sampling.
+            alive         = (Test-WorkerAlive $ProjectRoot)
+            # 'stalled' means the heartbeat is fresh (background timer) but the main thread has not
+            # sampled recently. Jobs are still queued; the worker tries to wake the loop. A modal
+            # dialog or a frozen native thread will not wake.
             stalled       = (Test-WorkerStalled $ProjectRoot)
             heartbeatAgeSeconds = if ($null -eq $age) { $null } else { [math]::Round($age, 2) }
             # Liveness and state age are reported separately on purpose. The heartbeat timestamp is
@@ -1239,7 +1278,8 @@ function Invoke-HostStatus {
             # unfocused or importing; the Unity state fields are only re-sampled when the Editor's own
             # update loop runs. A fresh heartbeat with an old state sample means "alive but not
             # executing", which is exactly what a caller needs to distinguish from "gone" - and it is
-            # why Test-WorkerOnline requires both.
+            # why Test-WorkerOnline requires both. Queuing still proceeds while the worker is alive;
+            # the worker wakes a throttled unfocused loop after the job file lands.
             stateSampledAtUtc = if ($heartbeat) { $heartbeat.stateSampledAtUtc } else { $null }
             mainThreadTickAtUtc = if ($heartbeat) { $heartbeat.mainThreadTickAtUtc } else { $null }
             pendingJobCount = if ($heartbeat) { $heartbeat.pendingJobCount } else { $null }
@@ -1275,8 +1315,8 @@ function Invoke-HostStatus {
 
     $warnings = @()
     if ($data.worker.stalled) {
-        $warnings += "The Editor's main thread has not ticked for $($data.worker.stateAgeSeconds) seconds: the heartbeat is fresh because a background timer publishes it, but no job can actually run. Unity is blocked in a synchronous operation or a modal dialog."
-    } elseif (-not $online) {
+        $warnings += "The Editor's main thread has not ticked for $($data.worker.stateAgeSeconds) seconds. Jobs are still accepted; the worker will try to wake an unfocused window. A modal dialog or a frozen native thread will not wake."
+    } elseif (-not (Test-WorkerAlive $ProjectRoot)) {
         $warnings += "The Unity Editor worker is not responding. Editor commands will fail with WORKER_UNAVAILABLE until Unity is open on this project."
     }
     if ($heartbeat -and $heartbeat.hasCompilationErrors) {
@@ -1424,10 +1464,10 @@ function Invoke-HostDoctor {
         $stalled = ($stateAge -gt 5)
         & $addCheck 'worker.stalled' (-not $stalled) `
             $(if ($stalled) {
-                "The heartbeat is fresh but the Editor's main thread has not ticked for $([int]$stateAge)s, so no job can run. Unity is blocked in a synchronous operation or a modal dialog: bring the window to the front, or restart the Editor."
+                "The heartbeat is fresh but the Editor's main thread has not ticked for $([int]$stateAge)s. Jobs are still queued; the worker will try to wake an unfocused window. A modal dialog or a frozen native thread will not wake."
             } else {
                 "The Editor's main thread is ticking (last sample $([int]$stateAge)s ago)."
-            }) 'error'
+            }) 'warning'
     }
 
     # The project file and the running Editor can disagree - Unity Hub will happily open a project with
@@ -1480,14 +1520,7 @@ function Invoke-HostDoctor {
 
     $packageRoot = Get-PackageRoot
     $extensionRoot = Get-ExtensionRoot $ProjectRoot
-    $extensionInsidePackage = $false
-    if (Test-Path -LiteralPath $extensionRoot) {
-        $packageFull = [System.IO.Path]::GetFullPath($packageRoot).TrimEnd('\', '/') +
-            [System.IO.Path]::DirectorySeparatorChar
-        $extensionFull = [System.IO.Path]::GetFullPath($extensionRoot)
-        $extensionInsidePackage = $extensionFull.StartsWith(
-            $packageFull, [System.StringComparison]::OrdinalIgnoreCase)
-    }
+    $extensionInsidePackage = Test-IsInsidePackage $extensionRoot
 
     & $addCheck 'extensions.placement' (-not $extensionInsidePackage) `
         $(if ($extensionInsidePackage) {
@@ -1592,9 +1625,21 @@ function Invoke-HostCommands {
 
     switch ($action) {
         'list' {
+            $surfaceFilter = $null
+            if ($Arguments.Payload.Contains('surface') -and $Arguments.Payload['surface']) {
+                $surfaceFilter = ([string]$Arguments.Payload['surface']).Trim().ToLowerInvariant()
+                if ($surfaceFilter -ne 'core' -and $surfaceFilter -ne 'extended') {
+                    return Write-CucliFailure -ErrorCode 'INVALID_PARAMETER' `
+                        -Message "--surface must be 'core' or 'extended'." `
+                        -Command 'commands' -Action 'list' -Format $Format
+                }
+            }
+
             $groups = New-Object System.Collections.Generic.List[object]
             foreach ($name in ($index.Groups.Keys | Sort-Object)) {
                 $group = $index.Groups[$name]
+                $surface = Get-GroupSurface $group
+                if ($surfaceFilter -and $surface -ne $surfaceFilter) { continue }
                 $actionObjects = @(Get-GroupActionObjects $group)
                 $groups.Add([ordered]@{
                     name           = $group.name
@@ -1609,11 +1654,13 @@ function Invoke-HostCommands {
                     optionalPackage = $group.optionalPackage
                     source         = $group.source
                     sourcePath     = $group.sourcePath
+                    surface        = $surface
                 })
             }
 
             $offline = New-Object System.Collections.Generic.List[object]
             foreach ($name in ($index.Offline.Keys | Sort-Object)) {
+                if ($surfaceFilter -eq 'extended') { continue }
                 $entry = $index.Offline[$name]
                 $offlineActions = @(Get-GroupActionObjects $entry)
                 $offline.Add([ordered]@{
@@ -1622,6 +1669,7 @@ function Invoke-HostCommands {
                     actionCount = $offlineActions.Count
                     actions     = $offlineActions
                     actionNames = @($offlineActions | ForEach-Object { $_.name })
+                    surface     = 'core'
                 })
             }
 
@@ -1949,7 +1997,7 @@ function Invoke-HostExtend {
                 manifestPath           = $manifest
                 localRegistryPath      = $localRegistry
                 localRegistryPresent   = (Test-Path -LiteralPath $localRegistry)
-                insidePackage          = $relative.StartsWith('Assets/Plugins/CustomUnityCli')
+                insidePackage          = (Test-IsInsidePackage $root)
                 overriddenByEnvironment = -not [string]::IsNullOrWhiteSpace($env:CUCLI_EXTENSIONS)
                 sourceFileCount        = @(Get-ExtensionSources $ProjectRoot).Count
             }
@@ -1987,7 +2035,7 @@ function Invoke-HostExtend {
             }
 
             $warnings = @()
-            if ($relative.StartsWith('Assets/Plugins/CustomUnityCli')) {
+            if (Test-IsInsidePackage $root) {
                 $warnings += "The extension area is INSIDE the package folder. Project code there can end up in the custom-unity-cli repository. Move it, or set `$env:CUCLI_EXTENSIONS to a path outside the package."
             }
             if (-not $data.exists) {
@@ -2046,7 +2094,7 @@ function Invoke-HostExtend {
             }
 
             $warnings = @()
-            if ($relative.StartsWith('Assets/Plugins/CustomUnityCli')) {
+            if (Test-IsInsidePackage $root) {
                 $warnings += "The extension area resolves INSIDE the package folder. Set `$env:CUCLI_EXTENSIONS to a path outside the package."
             }
 
@@ -2145,7 +2193,7 @@ OFFLINE GROUPS (no Unity required)
   status                       Worker heartbeat, queue depths, catalog source.
   doctor [--deep]              Diagnose project, package, worker and registry drift.
   logs game|cli|console        Tail a log source.
-  commands list|describe|groups|export
+  commands list [--surface core|extended]|describe|groups|export
                                Inspect or refresh the command catalog.
   job list|status|wait|result|cancel|clean
                                Inspect and control queued Editor work.
@@ -2263,17 +2311,7 @@ function Invoke-JobDispatch {
         }
     }
 
-    if (-not (Test-WorkerOnline $ProjectRoot)) {
-        # Distinguish "no Editor" from "Editor is there but frozen". Queueing into a frozen worker
-        # would look like success and then time out, which is worse than refusing immediately.
-        if (Test-WorkerStalled $ProjectRoot) {
-            $stateAge = [int](Get-HeartbeatStateAgeSeconds (Get-Heartbeat $ProjectRoot))
-            return Write-CucliFailure -ErrorCode 'WORKER_UNAVAILABLE' `
-                -Message "The Unity Editor for this project is not executing: its main thread has not ticked for $stateAge seconds, so a queued job could never run. Unity is blocked in a synchronous operation or a modal dialog; bring the Editor window to the front to check, or restart it. The job was NOT queued." `
-                -Data ([ordered]@{ stalled = $true; stateAgeSeconds = $stateAge }) `
-                -Command $Group -Action $Action -Format $Format
-        }
-
+    if (-not (Test-WorkerAlive $ProjectRoot)) {
         return Write-CucliFailure -ErrorCode 'WORKER_UNAVAILABLE' `
             -Message "No live Unity Editor worker for this project. Open the project (or run 'cucli open') and retry; run 'cucli status' for details." `
             -Command $Group -Action $Action -Format $Format

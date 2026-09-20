@@ -3,8 +3,8 @@
   "name": "com.igp.custom-unity-cli",
   "version": "0.1.0",
   "protocolVersion": 1,
-  "generatedAtUtc": "2026-09-19T18:13:34.2285163Z",
-  "catalogHash": "a55b902b12ba45e6e02205c8ab6b58eb8da91ea74ce4fc5a7fbcc64351d92cba",
+  "generatedAtUtc": "2026-09-20T06:28:26.2712268Z",
+  "catalogHash": "c11599d86adfdd53119994fa38c7353818d256eb2b09659ba86d1ef740b5e5c7",
   "description": "Static declaration of the cucli surface. The 'offline' section is served by Tools/cucli.ps1 itself. The 'groups' section is generated from the compiled Editor worker by 'cucli commands export' so that 'cucli commands list' works even while Unity is closed; an empty array only degrades offline listing, never dispatch. Project-local commands are deliberately NOT written here: they go to registry.local.json inside the project's extension area, outside this package, so project code can never be published with the package.",
   "aliases": {
     "go": "object",
@@ -225,6 +225,7 @@
         "project.assets.read",
         "scene.animator.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "clip_create",
@@ -638,6 +639,7 @@
         "project.assets.read",
         "project.assets.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "import",
@@ -718,7 +720,12 @@
             "description": "action=duplicate/move/rename: target path.",
             "aliases": [
               "destinationPath",
-              "destination_path"
+              "destination_path",
+              "targetPath",
+              "target_path",
+              "newName",
+              "new_name",
+              "name"
             ]
           },
           "assetType": {
@@ -762,9 +769,10 @@
           "filterType": {
             "type": "string",
             "aliases": [
-              "filter_type"
+              "filter_type",
+              "type"
             ],
-            "description": "action=search: type filter, e.g. Material or t:Material."
+            "description": "action=search: type filter, e.g. Material or t:Material. Also accepts --type."
           },
           "filterName": {
             "type": "string",
@@ -838,6 +846,7 @@
         "project.assets.write",
         "editor.state.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "status",
@@ -952,7 +961,10 @@
           },
           "property": {
             "type": "string",
-            "description": "action=settings: product_name|company_name|version|bundle_id|scripting_backend|defines|architecture."
+            "aliases": [
+              "key"
+            ],
+            "description": "action=settings: product_name|company_name|version|bundle_id|scripting_backend|defines|architecture。也接受 --key。"
           },
           "value": {
             "type": "string",
@@ -1030,6 +1042,7 @@
         "scene.camera.write",
         "scene.camera.read"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "ping",
@@ -1286,6 +1299,7 @@
         "filesystem.write",
         "editor.frame.read"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "game",
@@ -1415,10 +1429,11 @@
       "mayReloadDomain": false,
       "optionalPackage": null,
       "effects": [
-        "code.execute",
+        "editor.code.execute",
         "project.assets.write",
         "editor.state.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "run",
@@ -1517,6 +1532,7 @@
       "effects": [
         "editor.console.read"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "get",
@@ -1627,6 +1643,7 @@
         "project.settings.write",
         "editor.selection.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "state",
@@ -1783,6 +1800,7 @@
         "editor.frame.read",
         "filesystem.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "inspect",
@@ -1890,6 +1908,7 @@
         "project.lightmaps.write",
         "scene.render.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "ping",
@@ -2378,10 +2397,15 @@
         "editor.input.write",
         "editor.input.read"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "pointer-inspect",
           "summary": "What is under the pointer: UI elements with a safe text summary, the Scene-view object, and a game-view physics hit."
+        },
+        {
+          "name": "ui-pointer",
+          "summary": "Spelled the way the MCP contract spells it. Identical to pointer-inspect; both names stay registered so neither caller breaks."
         },
         {
           "name": "move",
@@ -2412,6 +2436,7 @@
             "type": "string",
             "enum": [
               "pointer-inspect",
+              "ui-pointer",
               "move",
               "click",
               "drag",
@@ -2443,6 +2468,10 @@
             "items": {
               "type": "object"
             }
+          },
+          "agent": {
+            "type": "string",
+            "description": "Gesture attribution, as in the MCP contract. Accepted and echoed back on the response; it never changes behaviour."
           },
           "deltaX": {
             "type": "number",
@@ -2518,6 +2547,7 @@
         "project.assets.read",
         "project.assets.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "ping",
@@ -2568,9 +2598,10 @@
           "materialPath": {
             "type": "string",
             "aliases": [
-              "material_path"
+              "material_path",
+              "path"
             ],
-            "description": "Assets 相对材质路径，自动补 Assets/ 前缀与 .mat 后缀。"
+            "description": "Assets 相对材质路径，自动补 Assets/ 前缀与 .mat 后缀。也接受 --path。"
           },
           "property": {
             "type": "string",
@@ -2641,6 +2672,7 @@
         "project.assets.read",
         "editor.memory.read"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "audit",
@@ -2653,6 +2685,10 @@
         {
           "name": "references",
           "summary": "Find which assets reference a given asset, plus its own dependency count."
+        },
+        {
+          "name": "deps",
+          "summary": "List what a given asset depends on, transitively by default."
         },
         {
           "name": "duplicates",
@@ -2673,6 +2709,7 @@
               "audit",
               "objects",
               "references",
+              "deps",
               "duplicates",
               "unused"
             ],
@@ -2798,6 +2835,7 @@
         "filesystem.write",
         "editor.state.read"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "doctor",
@@ -2898,6 +2936,7 @@
         "editor.scene.write",
         "project.assets.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "create",
@@ -3002,7 +3041,12 @@
           },
           "searchTerm": {
             "type": "string",
-            "description": "action=find：搜索词（target 为兼容别名）。"
+            "aliases": [
+              "search_term",
+              "target",
+              "name"
+            ],
+            "description": "action=find：搜索词（target / name 为兼容别名）。"
           },
           "includeInactive": {
             "type": "boolean",
@@ -3038,7 +3082,11 @@
           },
           "primitiveType": {
             "type": "string",
-            "description": "action=create：PrimitiveType 枚举名（Sphere / Capsule / Cylinder / Cube / Plane / Quad）。"
+            "aliases": [
+              "primitive_type",
+              "primitive"
+            ],
+            "description": "action=create：PrimitiveType 枚举名。也接受 --primitive。"
           },
           "prefabPath": {
             "type": "string",
@@ -3065,7 +3113,12 @@
           },
           "componentType": {
             "type": "string",
-            "description": "组件类型名，支持全限定名。"
+            "aliases": [
+              "component_type",
+              "component",
+              "type"
+            ],
+            "description": "组件类型名。也接受 --component。"
           },
           "componentIndex": {
             "type": "integer",
@@ -3179,6 +3232,7 @@
         "project.settings.write",
         "project.assets.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "ping",
@@ -3349,49 +3403,50 @@
         "editor.scene.write",
         "project.assets.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "ping",
           "summary": "Report the physics readiness summary: gravity, solver settings and simulation mode."
         },
         {
-          "name": "get-settings",
+          "name": "get_settings",
           "summary": "Read the 3D or 2D physics world settings."
         },
         {
-          "name": "set-settings",
+          "name": "set_settings",
           "summary": "Write whitelisted 3D or 2D physics world settings."
         },
         {
-          "name": "get-collision-matrix",
+          "name": "get_collision_matrix",
           "summary": "Read the layer collision matrix (lower triangle)."
         },
         {
-          "name": "set-collision-matrix",
+          "name": "set_collision_matrix",
           "summary": "Enable or disable collision between two layers."
         },
         {
-          "name": "get-rigidbody",
+          "name": "get_rigidbody",
           "summary": "Read a Rigidbody or Rigidbody2D."
         },
         {
-          "name": "configure-rigidbody",
+          "name": "configure_rigidbody",
           "summary": "Write whitelisted Rigidbody or Rigidbody2D properties."
         },
         {
-          "name": "apply-force",
+          "name": "apply_force",
           "summary": "Apply a force, torque or explosion to a rigidbody."
         },
         {
-          "name": "create-physics-material",
+          "name": "create_physics_material",
           "summary": "Create a PhysicMaterial (3D) or PhysicsMaterial2D resource."
         },
         {
-          "name": "configure-physics-material",
+          "name": "configure_physics_material",
           "summary": "Write whitelisted physics material properties."
         },
         {
-          "name": "assign-physics-material",
+          "name": "assign_physics_material",
           "summary": "Assign a physics material to a collider on a target."
         },
         {
@@ -3399,7 +3454,7 @@
           "summary": "Cast a ray and return the first hit."
         },
         {
-          "name": "raycast-all",
+          "name": "raycast_all",
           "summary": "Cast a ray and return every hit."
         },
         {
@@ -3415,19 +3470,19 @@
           "summary": "Return every collider overlapping a sphere, box or capsule."
         },
         {
-          "name": "simulate-step",
+          "name": "simulate_step",
           "summary": "Advance the physics world manually and report rigidbody motion."
         },
         {
-          "name": "add-joint",
+          "name": "add_joint",
           "summary": "Add a joint to a target."
         },
         {
-          "name": "configure-joint",
+          "name": "configure_joint",
           "summary": "Configure an existing joint's properties, motor, limits, spring or drive."
         },
         {
-          "name": "remove-joint",
+          "name": "remove_joint",
           "summary": "Remove joints from a target."
         },
         {
@@ -3443,25 +3498,25 @@
             "type": "string",
             "enum": [
               "ping",
-              "get-settings",
-              "set-settings",
-              "get-collision-matrix",
-              "set-collision-matrix",
-              "get-rigidbody",
-              "configure-rigidbody",
-              "apply-force",
-              "create-physics-material",
-              "configure-physics-material",
-              "assign-physics-material",
+              "get_settings",
+              "set_settings",
+              "get_collision_matrix",
+              "set_collision_matrix",
+              "get_rigidbody",
+              "configure_rigidbody",
+              "apply_force",
+              "create_physics_material",
+              "configure_physics_material",
+              "assign_physics_material",
               "raycast",
-              "raycast-all",
+              "raycast_all",
               "linecast",
               "shapecast",
               "overlap",
-              "simulate-step",
-              "add-joint",
-              "configure-joint",
-              "remove-joint",
+              "simulate_step",
+              "add_joint",
+              "configure_joint",
+              "remove_joint",
               "validate"
             ]
           },
@@ -3662,6 +3717,7 @@
         "project.assets.write",
         "editor.scene.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "create_from_gameobject",
@@ -3823,6 +3879,7 @@
         "editor.scene.write",
         "project.assets.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "ping",
@@ -4170,6 +4227,7 @@
         "editor.profiler.write",
         "filesystem.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "status",
@@ -4226,6 +4284,58 @@
         {
           "name": "frame-debugger-events",
           "summary": "按游标分页读取 Frame Debugger 事件列表。"
+        },
+        {
+          "name": "profiler_status",
+          "summary": "Alias of status (MCP spelling)."
+        },
+        {
+          "name": "profiler_start",
+          "summary": "Alias of start (MCP spelling)."
+        },
+        {
+          "name": "profiler_stop",
+          "summary": "Alias of stop (MCP spelling)."
+        },
+        {
+          "name": "profiler_set_areas",
+          "summary": "Alias of set-areas (MCP spelling)."
+        },
+        {
+          "name": "get_frame_timing",
+          "summary": "Alias of frame-timing (MCP spelling)."
+        },
+        {
+          "name": "get_counters",
+          "summary": "Alias of counters (MCP spelling)."
+        },
+        {
+          "name": "get_object_memory",
+          "summary": "Alias of object-memory (MCP spelling)."
+        },
+        {
+          "name": "memory_take_snapshot",
+          "summary": "Alias of snapshot-take (MCP spelling)."
+        },
+        {
+          "name": "memory_list_snapshots",
+          "summary": "Alias of snapshot-list (MCP spelling)."
+        },
+        {
+          "name": "memory_compare_snapshots",
+          "summary": "Alias of snapshot-compare (MCP spelling)."
+        },
+        {
+          "name": "frame_debugger_enable",
+          "summary": "Alias of frame-debugger-enable (MCP spelling)."
+        },
+        {
+          "name": "frame_debugger_disable",
+          "summary": "Alias of frame-debugger-disable (MCP spelling)."
+        },
+        {
+          "name": "frame_debugger_get_events",
+          "summary": "Alias of frame-debugger-events (MCP spelling)."
         }
       ],
       "parametersSchema": {
@@ -4248,7 +4358,20 @@
               "snapshot-compare",
               "frame-debugger-enable",
               "frame-debugger-disable",
-              "frame-debugger-events"
+              "frame-debugger-events",
+              "profiler_status",
+              "profiler_start",
+              "profiler_stop",
+              "profiler_set_areas",
+              "get_frame_timing",
+              "get_counters",
+              "get_object_memory",
+              "memory_take_snapshot",
+              "memory_list_snapshots",
+              "memory_compare_snapshots",
+              "frame_debugger_enable",
+              "frame_debugger_disable",
+              "frame_debugger_get_events"
             ],
             "default": "status"
           },
@@ -4350,6 +4473,7 @@
         "filesystem.write",
         "editor.frame.read"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "status",
@@ -4461,6 +4585,7 @@
       "effects": [
         "editor.state.read"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "get-type",
@@ -4514,13 +4639,13 @@
           },
           "includeInherited": {
             "type": "boolean",
-            "default": true,
-            "description": "get-type: include inherited members. True by default; set false, or use declaredOnly, for MCP's declared-only view."
+            "default": false,
+            "description": "get-type: include members inherited from base types. False by default, matching MCP; pass true (or declaredOnly: false) for the full callable surface."
           },
           "declaredOnly": {
             "type": "boolean",
-            "default": false,
-            "description": "get-type: list only the members this type declares itself, matching MCP's get_type."
+            "default": true,
+            "description": "get-type: list only the members this type declares itself. True by default, matching MCP's get_type."
           },
           "includeNoisy": {
             "type": "boolean",
@@ -4559,6 +4684,7 @@
         "project.recompile",
         "editor.state.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "assets",
@@ -4645,6 +4771,7 @@
         "editor.scene.read",
         "editor.scene.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "create",
@@ -4752,7 +4879,7 @@
           "force": {
             "type": "boolean",
             "default": false,
-            "description": "action=create：覆盖同名场景并丢弃未保存改动。"
+            "description": "action=create / load / close_scene：覆盖已有场景或丢弃未保存改动。"
           },
           "captureSource": {
             "type": "string",
@@ -4912,6 +5039,7 @@
         "project.assets.read",
         "project.assets.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "create",
@@ -4974,7 +5102,10 @@
           },
           "contents": {
             "type": "string",
-            "description": "action=create/update: 脚本正文。"
+            "aliases": [
+              "content"
+            ],
+            "description": "action=create/update: 脚本正文。也接受 --content."
           },
           "contentsEncoded": {
             "type": "boolean",
@@ -5065,6 +5196,7 @@
         "editor.state.read",
         "filesystem.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "core",
@@ -5130,6 +5262,7 @@
         "project.assets.read",
         "project.assets.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "create",
@@ -5233,6 +5366,7 @@
         "project.assets.read",
         "project.assets.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "create",
@@ -5346,6 +5480,7 @@
         "editor.tests.run",
         "editor.state.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "status",
@@ -5518,6 +5653,7 @@
         "project.assets.read",
         "project.assets.write"
       ],
+      "surface": "core",
       "actions": [
         {
           "name": "create",
@@ -5670,6 +5806,13 @@
               "import_settings"
             ]
           },
+          "filterMode": {
+            "type": "string",
+            "aliases": [
+              "filter_mode"
+            ],
+            "description": "action=set_import_settings：简写，写入 importSettings.filterMode。"
+          },
           "spriteSettings": {
             "description": "{pivot, pixelsPerUnit}；旧版 Sprite 设置入口。"
           },
@@ -5713,6 +5856,7 @@
         "project.assets.delete",
         "ui.visualtree.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "ping",
@@ -5973,6 +6117,7 @@
         "project.assets.write",
         "editor.scene.write"
       ],
+      "surface": "extended",
       "actions": [
         {
           "name": "ping",
