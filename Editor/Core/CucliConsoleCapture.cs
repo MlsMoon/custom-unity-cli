@@ -18,6 +18,7 @@ namespace CustomUnityCli.Editor
     internal static class CucliConsoleCapture
     {
         private const long MaximumFileBytes = 20L * 1024L * 1024L;
+        private static readonly string UserProfilePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
         private static readonly ConcurrentQueue<CucliConsoleEntry> Pending =
             new ConcurrentQueue<CucliConsoleEntry>();
@@ -135,11 +136,13 @@ namespace CustomUnityCli.Editor
         private static string Redact(string value)
         {
             if (string.IsNullOrEmpty(value)) return value;
-            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            string result = string.IsNullOrWhiteSpace(userProfile)
+            string result = string.IsNullOrWhiteSpace(UserProfilePath)
                 ? value
-                : value.Replace(userProfile, "<user>");
-            return Regex.Replace(result, @"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "<redacted-email>");
+                : value.Replace(UserProfilePath, "<user>");
+            // Avoid regex backtracking over long qualified names on the log-emitting thread.
+            return result.IndexOf('@') < 0
+                ? result
+                : Regex.Replace(result, @"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "<redacted-email>");
         }
     }
 

@@ -47,6 +47,9 @@ type(scope): imperative summary in English
 - Do not add `com.igp.world-environment` or other host-only packages as dependencies.
 - Target is Unity **2022.3**. Do not re-scope the manifest floor without an explicit
   support decision.
+- Console callbacks run on the log-emitting thread. Skip email matching when no `@`
+  is present, cache the process user-profile path, retain path redaction, and verify real trace costs and unchanged
+  email sanitization before changing the capture path.
 
 ## Architecture (where to look)
 

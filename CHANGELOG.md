@@ -136,6 +136,10 @@ In total **32 Editor command groups carrying 417 actions**, plus 9 offline group
 
 ### Fixed
 
+- Avoid email-regex backtracking on address-free console messages and stack traces,
+  and cache the process user-profile path instead of querying it for each log field,
+  preventing log bursts from stalling the Editor while preserving redaction.
+
 All four found by running `cucli selftest` against the CLI itself.
 
 - **Negative numeric arguments were consumed as flags instead of values.** The parser decided that
